@@ -79,7 +79,7 @@ For comprehensive guides, advanced examples, and configuration options, visit:
 
 ## Contributing
 
-Contributions are welcome! Please see our [Contributing Guidelines](https://github.com/ZeusDB/.github/CONTRIBUTING.md) for details.
+Contributions are welcome! Please see our [Contributing Guidelines](https://github.com/ZeusDB/.github/blob/main/CONTRIBUTING.md) for details.
 
 ## Support
 
