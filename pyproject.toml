@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "llama-index-vector-stores-zeusdb"
 version = "0.1.0"
-description = "LlamaIndex vector store integration for ZeusDB."
+description = "LlamaIndex integration for ZeusDB vector database. Enterprise-grade RAG with high-performance vector search."
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 license = { text = "MIT" }

@@ -1,6 +1,6 @@
-# ZeusDB Vector Store for LlamaIndex
+# LlamaIndex ZeusDB Integration
 
-ZeusDB vector store integration for LlamaIndex. Connect LlamaIndex's RAG framework with high-performance, enterprise-grade vector storage.
+ZeusDB vector database integration for LlamaIndex. Connect LlamaIndex's RAG framework with high-performance, enterprise-grade vector database.
 
 ## Features
 
