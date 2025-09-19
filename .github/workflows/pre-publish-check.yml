@@ -1,0 +1,41 @@
+# Check that the package builds cleanly (manual run only)
+name: Check Package Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tool
+        run: pip install hatch
+
+      - name: Build distributions
+        run: hatch build  # outputs dist/*
+
+      - name: Inspect build artifacts (optional)
+        run: |
+          ls -lh dist/
+          file dist/* || true
+
+      - name: Validate metadata (optional)
+        run: |
+          pip install twine
+          twine check dist/*
+
+      - name: Upload build artifacts (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
