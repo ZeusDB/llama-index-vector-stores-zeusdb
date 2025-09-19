@@ -1,5 +1,5 @@
 # Check that the package builds cleanly (manual run only)
-name: Check Package Build
+name: Check Package Build (no pypi upload)
 
 on:
   workflow_dispatch:
