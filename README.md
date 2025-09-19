@@ -69,7 +69,7 @@ print(response)
 
 For comprehensive guides, advanced examples, and configuration options, visit:
 
-**[ZeusDB LlamaIndex Documentation](https://docs.zeusdb.com/integrations/llamaindex)**
+**[ZeusDB LlamaIndex Documentation](https://docs.zeusdb.com/en/latest/vector_database/integrations/llamaindex.html)**
 
 ## Requirements
 
