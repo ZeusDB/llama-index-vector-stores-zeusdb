@@ -172,26 +172,74 @@ def _translate_filter_op(op: FilterOperator) -> str:
     return mapping.get(op, "eq")
 
 
+# def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
+#     """
+#     Convert LlamaIndex MetadataFilters (nested + operators) to ZeusDB filter dict.
+#     """
+#     if filters is None:
+#         return None
+
+#     def _one(f: MetadataFilter | MetadataFilters) -> dict[str, Any]:
+#         if isinstance(f, MetadataFilters):
+#             cond = (f.condition or FilterCondition.AND).value.lower()
+#             sub = [_one(sf) for sf in f.filters]
+#             if len(sub) == 1:
+#                 return sub[0] if cond == "and" else {cond: sub}
+#             return {cond: sub}
+#         op_key = _translate_filter_op(f.operator)
+#         return {f.key: {op_key: f.value}}
+
+#     z = _one(filters)
+#     logger.debug("translated_filters", zeusdb_filter=z)
+#     return z
+
+
 def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
     """
-    Convert LlamaIndex MetadataFilters (nested + operators) to ZeusDB filter dict.
+    Convert LlamaIndex MetadataFilters to ZeusDB flat format.
+    
+    ZeusDB expects flat dict with implicit AND:
+        {"key1": value, "key2": {"op": value}}
     """
     if filters is None:
         return None
-
+    
     def _one(f: MetadataFilter | MetadataFilters) -> dict[str, Any]:
         if isinstance(f, MetadataFilters):
             cond = (f.condition or FilterCondition.AND).value.lower()
             sub = [_one(sf) for sf in f.filters]
-            if len(sub) == 1:
-                return sub[0] if cond == "and" else {cond: sub}
-            return {cond: sub}
+            
+            if cond == "and":
+                # Merge into flat dict (implicit AND)
+                result = {}
+                for s in sub:
+                    result.update(s)
+                return result
+            else:
+                # OR is NOT supported by Rust implementation
+                logger.warning(
+                    "OR filters not supported by ZeusDB backend",
+                    operation="filter_translation",
+                    condition=cond
+                )
+                # Fallback: return first filter only
+                return sub[0] if sub else {}
+        
+        # Single filter
         op_key = _translate_filter_op(f.operator)
-        return {f.key: {op_key: f.value}}
+        
+        if op_key == "eq":
+            # Direct value for equality (matches Rust code)
+            return {f.key: f.value}
+        else:
+            # Operator wrapper for other ops
+            return {f.key: {op_key: f.value}}
+    
+    result = _one(filters)  # Changed from 'z' to 'result' for consistency
+    
+    logger.debug("translated_filters", zeusdb_filter=result)
+    return result
 
-    z = _one(filters)
-    logger.debug("translated_filters", zeusdb_filter=z)
-    return z
 
 
 # -------------------------

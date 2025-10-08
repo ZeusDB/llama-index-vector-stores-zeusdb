@@ -47,77 +47,142 @@ class _FakeIndex:
             assigned.append(rid)
         return {"ids": assigned}
 
+
+
+    # def _match_filter(self, meta, zfilter):
+    #     # zfilter format produced by adapter, 
+    #     # supports nested {"and":[...]}, {"or":[...]}, {"not": {...}}
+    #     if not zfilter:
+    #         return True
+
+    #     if "and" in zfilter:
+    #         return all(self._match_filter(meta, sub) for sub in zfilter["and"])
+    #     if "or" in zfilter:
+    #         return any(self._match_filter(meta, sub) for sub in zfilter["or"])
+    #     if "not" in zfilter:
+    #         return not self._match_filter(meta, zfilter["not"])
+
+    #     # leaf: {key: {op: value}}
+    #     for key, cond in zfilter.items():
+    #         # treat missing key as None
+    #         val = meta.get(key, None)
+    #         for op, v in cond.items():
+    #             if op == "eq":
+    #                 if val != v:
+    #                     return False
+    #             elif op == "ne":
+    #                 if val == v:
+    #                     return False
+    #             elif op == "gt":
+    #                 if not (isinstance(val, int | float) and val > v):
+    #                     return False
+    #             elif op == "lt":
+    #                 if not (isinstance(val, int | float) and val < v):
+    #                     return False
+    #             elif op == "gte":
+    #                 if not (isinstance(val, int | float) and val >= v):
+    #                     return False
+    #             elif op == "lte":
+    #                 if not (isinstance(val, int | float) and val <= v):
+    #                     return False
+    #             elif op == "in":
+    #                 if val not in set(v):
+    #                     return False
+    #             elif op == "nin":
+    #                 if val in set(v):
+    #                     return False
+    #             elif op == "any":
+    #                 # v is list[str], val must be list[str] and share any item
+    #                 if not (isinstance(val, list) and any(x in val for x in v)):
+    #                     return False
+    #             elif op == "all":
+    #                 if not (isinstance(val, list) and all(x in val for x in v)):
+    #                     return False
+    #             elif op == "contains":
+    #                 if isinstance(val, list):
+    #                     if v not in val:
+    #                         return False
+    #                 elif isinstance(val, str):
+    #                     if str(v) not in val:
+    #                         return False
+    #                 else:
+    #                     return False
+    #             elif op == "text_match":
+    #                 if not (isinstance(val, str) and str(v) in val):
+    #                     return False
+    #             elif op == "text_match_insensitive":
+    #                 if not (isinstance(val, str) and str(v).lower() in val.lower()):
+    #                     return False
+    #             elif op == "is_empty":
+    #                 if val not in (None, "", [], {}):
+    #                     return False
+    #             else:
+    #                 # unknown op -> fail closed for the leaf to be safe
+    #                 return False
+    #     return True
+    
+
     def _match_filter(self, meta, zfilter):
-        # zfilter format produced by adapter, 
-        # supports nested {"and":[...]}, {"or":[...]}, {"not": {...}}
+        """Match filter in FLAT format (like actual Rust code)."""
         if not zfilter:
             return True
+        
+        # Iterate over flat filter dict
+        for field, condition in zfilter.items():
+            field_value = meta.get(field)
 
-        if "and" in zfilter:
-            return all(self._match_filter(meta, sub) for sub in zfilter["and"])
-        if "or" in zfilter:
-            return any(self._match_filter(meta, sub) for sub in zfilter["or"])
-        if "not" in zfilter:
-            return not self._match_filter(meta, zfilter["not"])
-
-        # leaf: {key: {op: value}}
-        for key, cond in zfilter.items():
-            # treat missing key as None
-            val = meta.get(key, None)
-            for op, v in cond.items():
-                if op == "eq":
-                    if val != v:
-                        return False
-                elif op == "ne":
-                    if val == v:
-                        return False
-                elif op == "gt":
-                    if not (isinstance(val, int | float) and val > v):
-                        return False
-                elif op == "lt":
-                    if not (isinstance(val, int | float) and val < v):
-                        return False
-                elif op == "gte":
-                    if not (isinstance(val, int | float) and val >= v):
-                        return False
-                elif op == "lte":
-                    if not (isinstance(val, int | float) and val <= v):
-                        return False
-                elif op == "in":
-                    if val not in set(v):
-                        return False
-                elif op == "nin":
-                    if val in set(v):
-                        return False
-                elif op == "any":
-                    # v is list[str], val must be list[str] and share any item
-                    if not (isinstance(val, list) and any(x in val for x in v)):
-                        return False
-                elif op == "all":
-                    if not (isinstance(val, list) and all(x in val for x in v)):
-                        return False
-                elif op == "contains":
-                    if isinstance(val, list):
-                        if v not in val:
-                            return False
-                    elif isinstance(val, str):
-                        if str(v) not in val:
-                            return False
-                    else:
-                        return False
-                elif op == "text_match":
-                    if not (isinstance(val, str) and str(v) in val):
-                        return False
-                elif op == "text_match_insensitive":
-                    if not (isinstance(val, str) and str(v).lower() in val.lower()):
-                        return False
-                elif op == "is_empty":
-                    if val not in (None, "", [], {}):
-                        return False
-                else:
-                    # unknown op -> fail closed for the leaf to be safe
+            # Direct value = equality check
+            if isinstance(condition, (str, int, float, bool, type(None))):
+                if field_value != condition:
                     return False
+            # Operator dict
+            elif isinstance(condition, dict):
+                for op, target_value in condition.items():
+                    if op == "eq" and field_value != target_value:
+                        return False
+                    elif op == "ne" and field_value == target_value:
+                        return False
+                    elif op == "gt" and not (
+                        isinstance(field_value, (int, float)) 
+                        and field_value > target_value
+                    ):
+                        return False
+                    elif op == "gte" and not (
+                        isinstance(field_value, (int, float)) 
+                        and field_value >= target_value
+                    ):
+                        return False
+                    elif op == "lt" and not (
+                        isinstance(field_value, (int, float)) 
+                        and field_value < target_value
+                    ):
+                        return False
+                    elif op == "lte" and not (
+                        isinstance(field_value, (int, float)) 
+                        and field_value <= target_value
+                    ):
+                        return False
+                    elif op == "in" and field_value not in target_value:
+                        return False
+                    elif op == "contains":
+                        if isinstance(
+                            field_value, 
+                            list
+                        ) and target_value not in field_value:
+                            return False
+                        elif isinstance(
+                            field_value, 
+                            str
+                        ) and str(target_value) not in field_value:
+                            return False
+                        else:
+                            return False
+                    # Add other operators as needed
+
         return True
+    
+
+
 
     def search(self, vector, top_k=5, filter=None, ef_search=None, return_vector=False):
         # filter records

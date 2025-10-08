@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llama-index-vector-stores-zeusdb"
-version = "0.1.0"
+version = "0.1.1"
 description = "LlamaIndex integration for ZeusDB vector database. Enterprise-grade RAG with high-performance vector search."
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
@@ -13,7 +13,7 @@ authors = [{ name = "ZeusDB", email = "contact@zeusdb.com" }]
 
 # Runtime dependencies
 dependencies = [
-    "llama-index-core>=0.13.6",  # Latest release as of Sept 7, 2025
+    "llama-index-core>=0.14.4",  # Latest release as of Oct 4, 2025
     "zeusdb>=0.0.8",  # Megapackage version
 ]
 
@@ -39,6 +39,9 @@ dev = [
     # "types-redis>=4.6.0", # Latest
     "types-requests>=2.32", # Latest KEEP
     # "types-setuptools>=80.9", # Latest
+    "llama-index-embeddings-openai",
+    "llama-index-llms-openai",
+    "python-dotenv>=1.1.1",  # For examples and environment variable loading    
 ]
 
 [project.urls]
@@ -82,6 +85,8 @@ include = [
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+
+[tool.ruff.lint]
 select = [
     "E",     # pycodestyle errors
     "F",     # pyflakes
