@@ -447,50 +447,104 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
     # -------------------------
 
     def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
-        zfilter = {"ref_doc_id": {"eq": ref_doc_id}}
-        with operation_context("delete_by_ref_doc_id", ref_doc_id=ref_doc_id):
-            try:
-                if hasattr(self._index, "delete"):
-                    self._index.delete(filters=zfilter)  # type: ignore[attr-defined]
-            except Exception as e:
-                logger.error(
-                    "ZeusDB delete operation failed",
-                    operation="delete_by_ref_doc_id",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    exc_info=True,
-                )
-                raise
+        """
+        Delete all nodes associated with a ref_doc_id.
 
+        ⚠️  LIMITATION: This method is NOT SUPPORTED by ZeusDB's HNSW backend.
+
+        The HNSW index only supports deletion by node ID via remove_point().
+        There is no filter-based deletion or scalable way to find all node IDs
+        for a given ref_doc_id (list() doesn't work in QuantizedOnly mode).
+
+        This method will raise NotImplementedError to be honest about the limitation.
+    
+        Alternative: Use delete_nodes(node_ids=[...]) if you have the node IDs.
+        """
+        logger.error(
+            "delete() by ref_doc_id is not supported by ZeusDB HNSW backend",
+            operation="delete",
+            ref_doc_id=ref_doc_id,
+        )
+        raise NotImplementedError(
+            "ZeusDB HNSW backend does not support deletion by ref_doc_id. "
+            "The backend only supports ID-based deletion via remove_point(). "
+            "Use delete_nodes(node_ids=[...]) instead if you have the node IDs."
+        )
+    
     def delete_nodes(
         self,
         node_ids: list[str] | None = None,
         filters: MetadataFilters | None = None,
         **delete_kwargs: Any,
     ) -> None:
-        zfilter = _filters_to_zeusdb(filters)
-        if node_ids:
-            id_filters = [{"node_id": {"in": list(map(str, node_ids))}}]
-            if zfilter is None:
-                zfilter = {"and": id_filters}
-            else:
-                zfilter = {"and": [zfilter] + id_filters}
-
-        if zfilter is None:
+        """
+        Delete nodes by IDs.
+    
+        ✅ SUPPORTED: Deletion by explicit node IDs via remove_point().
+        ❌ NOT SUPPORTED: Deletion by metadata filters.
+    
+        Args:
+            node_ids: List of node IDs to delete (supported)
+            filters: Metadata filters (NOT supported - will raise error if provided)
+    
+        Note: ZeusDB HNSW only supports direct ID-based deletion.
+        """
+        if filters:
+            logger.error(
+                "delete_nodes() with filters is not supported by ZeusDB HNSW backend",
+                operation="delete_nodes",
+                has_filters=True,
+            )
+            raise NotImplementedError(
+                "ZeusDB HNSW backend does not support filter-based deletion. "
+                "Only direct node ID deletion is supported."
+            )
+        
+        if not node_ids:
+            logger.debug("delete_nodes called with no node_ids")
             return
-
-        with operation_context(
-            "delete_nodes",
-            node_ids_count=len(node_ids or []),
-            has_filters=zfilter is not None,
-        ):
+        
+        with operation_context("delete_nodes", node_ids_count=len(node_ids)):
             try:
-                if hasattr(self._index, "delete"):
-                    self._index.delete(filters=zfilter)  # type: ignore[attr-defined]
+                success_count = 0
+                failed_ids = []
+
+                for node_id in node_ids:
+                    try:
+                        result = self._index.remove_point(node_id)
+                        if result:
+                            success_count += 1
+                        else:
+                            failed_ids.append(node_id)
+                    except Exception as e:
+                        failed_ids.append(node_id)
+                        logger.warning(
+                            "Failed to remove point",
+                            operation="delete_nodes",
+                            node_id=node_id,
+                            error=str(e),
+                        )
+
+                logger.info(
+                    "Delete nodes completed",
+                    operation="delete_nodes",
+                    requested=len(node_ids),
+                    deleted=success_count,
+                    failed=len(failed_ids),
+                )
+
+                if failed_ids and len(failed_ids) < 10:
+                    logger.debug(
+                        "Failed node IDs",
+                        operation="delete_nodes",
+                        failed_ids=failed_ids,
+                    )
+
             except Exception as e:
                 logger.error(
-                    "ZeusDB delete_nodes operation failed",
+                    "Delete nodes failed",
                     operation="delete_nodes",
+                    node_ids_count=len(node_ids),
                     error=str(e),
                     error_type=type(e).__name__,
                     exc_info=True,
@@ -498,19 +552,37 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 raise
 
     def clear(self) -> None:
+        """
+        Clear all vectors from the index.
+    
+        ⚠️  LIMITATION: May not work correctly in QuantizedOnly mode.
+    
+        The clear() method may not properly clear quantized-only vectors.
+        """
         with operation_context("clear_index"):
             try:
                 if hasattr(self._index, "clear"):
-                    self._index.clear()  # type: ignore[attr-defined]
+                    self._index.clear()
+                    logger.info("Index cleared", operation="clear_index")
+                else:
+                    logger.warning(
+                        "clear() not available on index",
+                        operation="clear_index",
+                    )
+                    raise NotImplementedError(
+                        "ZeusDB index does not expose clear() method"
+                    )
             except Exception as e:
                 logger.error(
-                    "ZeusDB clear operation failed",
+                    "Clear operation failed",
                     operation="clear_index",
                     error=str(e),
                     error_type=type(e).__name__,
                     exc_info=True,
                 )
                 raise
+
+
 
     # -------------------------
     # Query (with optional MMR)

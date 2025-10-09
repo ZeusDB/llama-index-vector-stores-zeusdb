@@ -47,80 +47,12 @@ class _FakeIndex:
             assigned.append(rid)
         return {"ids": assigned}
 
-
-
-    # def _match_filter(self, meta, zfilter):
-    #     # zfilter format produced by adapter, 
-    #     # supports nested {"and":[...]}, {"or":[...]}, {"not": {...}}
-    #     if not zfilter:
-    #         return True
-
-    #     if "and" in zfilter:
-    #         return all(self._match_filter(meta, sub) for sub in zfilter["and"])
-    #     if "or" in zfilter:
-    #         return any(self._match_filter(meta, sub) for sub in zfilter["or"])
-    #     if "not" in zfilter:
-    #         return not self._match_filter(meta, zfilter["not"])
-
-    #     # leaf: {key: {op: value}}
-    #     for key, cond in zfilter.items():
-    #         # treat missing key as None
-    #         val = meta.get(key, None)
-    #         for op, v in cond.items():
-    #             if op == "eq":
-    #                 if val != v:
-    #                     return False
-    #             elif op == "ne":
-    #                 if val == v:
-    #                     return False
-    #             elif op == "gt":
-    #                 if not (isinstance(val, int | float) and val > v):
-    #                     return False
-    #             elif op == "lt":
-    #                 if not (isinstance(val, int | float) and val < v):
-    #                     return False
-    #             elif op == "gte":
-    #                 if not (isinstance(val, int | float) and val >= v):
-    #                     return False
-    #             elif op == "lte":
-    #                 if not (isinstance(val, int | float) and val <= v):
-    #                     return False
-    #             elif op == "in":
-    #                 if val not in set(v):
-    #                     return False
-    #             elif op == "nin":
-    #                 if val in set(v):
-    #                     return False
-    #             elif op == "any":
-    #                 # v is list[str], val must be list[str] and share any item
-    #                 if not (isinstance(val, list) and any(x in val for x in v)):
-    #                     return False
-    #             elif op == "all":
-    #                 if not (isinstance(val, list) and all(x in val for x in v)):
-    #                     return False
-    #             elif op == "contains":
-    #                 if isinstance(val, list):
-    #                     if v not in val:
-    #                         return False
-    #                 elif isinstance(val, str):
-    #                     if str(v) not in val:
-    #                         return False
-    #                 else:
-    #                     return False
-    #             elif op == "text_match":
-    #                 if not (isinstance(val, str) and str(v) in val):
-    #                     return False
-    #             elif op == "text_match_insensitive":
-    #                 if not (isinstance(val, str) and str(v).lower() in val.lower()):
-    #                     return False
-    #             elif op == "is_empty":
-    #                 if val not in (None, "", [], {}):
-    #                     return False
-    #             else:
-    #                 # unknown op -> fail closed for the leaf to be safe
-    #                 return False
-    #     return True
-    
+    def remove_point(self, node_id):
+        """Remove a point by ID - ADDED FOR DELETE SUPPORT"""
+        initial_count = len(self.records)
+        self.records = [r for r in self.records if r["id"] != str(node_id)]
+        removed = initial_count > len(self.records)
+        return removed  # Return True if something was removed
 
     def _match_filter(self, meta, zfilter):
         """Match filter in FLAT format (like actual Rust code)."""
@@ -177,12 +109,8 @@ class _FakeIndex:
                             return False
                         else:
                             return False
-                    # Add other operators as needed
-
+        
         return True
-    
-
-
 
     def search(self, vector, top_k=5, filter=None, ef_search=None, return_vector=False):
         # filter records
@@ -202,17 +130,26 @@ class _FakeIndex:
         scored.sort(key=lambda x: x["distance"])
         return {"results": scored[:top_k]}
 
-    def delete(self, filters=None):
-        if not filters:
-            return
-        self.records = [
-            r 
-            for r in self.records 
-            if not self._match_filter(
-                r["metadata"] | {"node_id": r["id"]}, 
-                filters
-            )
-        ]
+    def get_records(self, ids, return_vector=False):
+        """Get records by IDs - needed for node reconstruction."""
+        if isinstance(ids, str):
+            ids = [ids]
+        
+        results = []
+        id_set = set(str(i) for i in ids)
+        
+        for record in self.records:
+            if str(record["id"]) in id_set:
+                result = {
+                    "id": record["id"],
+                    "metadata": record["metadata"].copy(),
+                    "score": 0.0,
+                }
+                if return_vector:
+                    result["vector"] = record["vector"]
+                results.append(result)
+        
+        return results
 
     def clear(self):
         self.records.clear()
@@ -234,7 +171,7 @@ class _FakeVectorDatabase:
         return _FakeIndex(dim=dim, space=space, **kwargs)
 
     def load(self, path):
-        # In a “real” load we’d deserialize. For tests, hand back an empty index.
+        # In a "real" load we'd deserialize. For tests, hand back an empty index.
         return _FakeIndex(dim=8, space="cosine")
 
 
@@ -244,7 +181,7 @@ def fake_zeusdb_module(monkeypatch):
     Install a fake `zeusdb` module *before* importing the adapter.
     """
     mod = types.ModuleType("zeusdb")
-    mod.VectorDatabase = _FakeVectorDatabase # type: ignore[attr-defined]
+    mod.VectorDatabase = _FakeVectorDatabase  # type: ignore[attr-defined]
     # optional logging_config fallback (adapter handles absence)
     sys.modules["zeusdb"] = mod
     yield
@@ -309,9 +246,6 @@ def test_filters_and_delete_nodes(ZeusDBVectorStore):
         VectorStoreQuery,
     )
 
-
-
-
     mf = MetadataFilters.from_dicts(
         [
             {"key": "category", "value": "x", "operator": FilterOperator.EQ},
@@ -339,7 +273,8 @@ def test_filters_and_delete_nodes(ZeusDBVectorStore):
     assert set(res2.ids) == {"1"}
 
 
-def test_delete_by_ref_doc_id(ZeusDBVectorStore):
+def test_delete_by_ref_doc_id_not_supported(ZeusDBVectorStore):
+    """Test that delete by ref_doc_id raises NotImplementedError."""
     store = ZeusDBVectorStore(dim=3)
     nodes = [
         FakeNode("a", [1.0, 0.0, 0.0], {"k": 1}, id_="1", ref_doc_id="docA"),
@@ -348,7 +283,31 @@ def test_delete_by_ref_doc_id(ZeusDBVectorStore):
     ]
     store.add(nodes)
 
-    store.delete("docA")
+    # Should raise NotImplementedError
+    with pytest.raises(NotImplementedError) as exc_info:
+        store.delete("docA")
+    
+    assert "ref_doc_id" in str(exc_info.value).lower()
+    assert "remove_point" in str(exc_info.value).lower()
+
+
+def test_delete_nodes_by_id_works(ZeusDBVectorStore):
+    """Test that delete_nodes by ID works correctly."""
+    store = ZeusDBVectorStore(dim=3)
+    nodes = [
+        FakeNode("a", [1.0, 0.0, 0.0], {"k": 1}, id_="1", ref_doc_id="docA"),
+        FakeNode("b", [0.0, 1.0, 0.0], {"k": 2}, id_="2", ref_doc_id="docA"),
+        FakeNode("c", [0.0, 0.0, 1.0], {"k": 3}, id_="3", ref_doc_id="docB"),
+    ]
+    store.add(nodes)
+    
+    assert store.get_vector_count() == 3
+    
+    # Delete by node IDs
+    store.delete_nodes(node_ids=["1", "2"])
+    
+    assert store.get_vector_count() == 1
+    
     from llama_index.core.vector_stores.types import VectorStoreQuery
     res = store.query(
         VectorStoreQuery(
@@ -411,8 +370,12 @@ async def test_async_paths(ZeusDBVectorStore):
     res = await store.aquery(VectorStoreQuery(query_embedding=q, similarity_top_k=1))
     assert res.ids and res.ids[0] == "1"
 
-    await store.adelete(ref_doc_id="d")
-    # after delete, no results
+    # adelete by ref_doc_id should raise NotImplementedError
+    with pytest.raises(NotImplementedError):
+        await store.adelete(ref_doc_id="d")
+    
+    # But adelete_nodes by ID should work
+    await store.adelete_nodes(node_ids=["1"])
     res2 = await store.aquery(VectorStoreQuery(query_embedding=q, similarity_top_k=1))
     assert res2.ids == [] or res2.ids is None
 
@@ -422,7 +385,7 @@ async def test_async_paths(ZeusDBVectorStore):
 
 def test_query_with_mmr(ZeusDBVectorStore):
     store = ZeusDBVectorStore(dim=3)
-    # three “near-ish” points around e1
+    # three "near-ish" points around e1
     nodes = [
         FakeNode("n1", [1.0, 0.0, 0.0], {}, id_="1", ref_doc_id="d"),
         FakeNode("n2", [0.9, 0.1, 0.0], {}, id_="2", ref_doc_id="d"),
@@ -438,3 +401,4 @@ def test_query_with_mmr(ZeusDBVectorStore):
     )
     assert len(res.ids) == 2
     assert set(res.ids).issubset({"1", "2", "3"})
+    
