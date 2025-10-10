@@ -970,3 +970,197 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 error_type=type(e).__name__,
             )
         return False
+    
+    def info(self) -> str:
+        """
+        Get a human-readable info string about the index.
+
+        Example:
+        >>> print(vector_store.info())
+        HNSWIndex(dim=1536, space=cosine, vectors=1200, quantized=True, ...)
+        """
+        try:
+            info_str = self._index.info()
+            logger.debug(
+                "Retrieved index info",
+                operation="info",
+                info_length=len(info_str)
+            )
+            return info_str
+        except Exception as e:
+            logger.error(
+                "Failed to get index info",
+                operation="info",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return f"ZeusDBVectorStore(error: {e})"
+        
+
+    # -------------------------------------------------------------------------
+    # Quantization Methods
+    # -------------------------------------------------------------------------
+
+    def get_training_progress(self) -> float:
+        """
+        Get quantization training progress percentage.
+    
+        Returns:
+            float: Training progress as percentage (0.0 to 100.0).
+                Returns 0.0 if quantization is not configured or on error.
+    
+        Example:
+            >>> progress = vector_store.get_training_progress()
+            >>> print(f"Training: {progress:.1f}% complete")
+        """
+        try:
+            progress = self._index.get_training_progress()
+            logger.debug(
+                "Retrieved training progress",
+                operation="get_training_progress",
+                progress_percent=progress,
+            )
+            return progress
+        except Exception as e:
+            logger.error(
+                "Failed to get training progress",
+                operation="get_training_progress",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return 0.0
+        
+    def is_quantized(self) -> bool:
+        """
+        Check whether quantized search is currently active.
+
+        Returns:
+            bool: True if index is using quantized vectors for search,
+            False otherwise or on error.
+
+        Example:
+            >>> if vector_store.is_quantized():
+            ...     print("Using quantized search")
+        """
+        try:
+            quantized = self._index.is_quantized()
+            logger.debug(
+                "Retrieved quantization status",
+                operation="is_quantized",
+                is_quantized=quantized,
+            )
+            return quantized
+        except Exception as e:
+            logger.error(
+                "Failed to check quantization status",
+                operation="is_quantized",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return False
+        
+    def can_use_quantization(self) -> bool:
+        """
+        Check whether quantization is available (e.g., PQ training completed).
+
+        Returns:
+            bool: True if quantization is trained and ready to use,
+            False otherwise or on error.
+
+        Example:
+            >>> if vector_store.can_use_quantization():
+            ...     print("Quantization ready")
+        """
+        try:
+            available = self._index.can_use_quantization()
+            logger.debug(
+                "Retrieved quantization availability",
+                operation="can_use_quantization",
+                can_use_quantization=available,
+            )
+            return available
+        except Exception as e:
+            logger.error(
+                "Failed to check quantization availability",
+                operation="can_use_quantization",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return False
+        
+    def get_storage_mode(self) -> str:
+        """
+        Get current storage mode.
+
+        Returns:
+            str: Storage mode string. Possible values:
+                - 'raw_only': Only raw vectors stored
+                - 'quantized_only': Only quantized vectors (memory optimized)
+                - 'quantized_with_raw': Both quantized and raw vectors
+                - 'quantized_active': Quantization is active
+                - 'unknown': On error or unable to determine
+
+        Example:
+            >>> mode = vector_store.get_storage_mode()
+            >>> print(f"Storage mode: {mode}")
+        """
+        try:
+            mode = self._index.get_storage_mode()
+            logger.debug(
+                "Retrieved storage mode",
+                operation="get_storage_mode",
+                storage_mode=mode,
+            )
+            return mode
+        except Exception as e:
+            logger.error(
+                "Failed to get storage mode",
+                operation="get_storage_mode",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return "unknown"
+        
+    def get_quantization_info(self) -> dict[str, Any] | None:
+        """
+        Get detailed quantization information.
+
+        Returns:
+            Optional[Dict]: Dictionary containing quantization details:
+                - compression_ratio: Memory compression factor (e.g., 16.0 for 16x)
+                - memory_mb: Estimated memory usage in megabytes
+                - subvectors: Number of subvectors used
+                - bits: Bits per quantized code
+                - trained: Whether training is complete
+                - training_size: Number of vectors used for training
+                Returns None if quantization is not configured/trained or on error.
+
+        Example:
+            >>> info = vector_store.get_quantization_info()
+            >>> if info:
+            ...     print(f"Compression: {info['compression_ratio']:.1f}x")
+            ...     print(f"Memory: {info['memory_mb']:.2f} MB")
+        """
+        try:
+            info = self._index.get_quantization_info()
+            logger.debug(
+                "Retrieved quantization info",
+                operation="get_quantization_info",
+                has_quantization=info is not None,
+            )
+            return info
+        except Exception as e:
+            logger.error(
+                "Failed to get quantization info",
+                operation="get_quantization_info",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return None
+

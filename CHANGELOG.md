@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Delete examples - Added `examples/delete_examples.py` demonstrating supported deletion operations and workarounds.
 - Test coverage - Added tests for ID-based deletion and proper error handling for unsupported operations.
+- Addeed Product Quantization (PQ) support - Full support for memory-efficient vector compression with automatic training
 
 ### Changed
 
