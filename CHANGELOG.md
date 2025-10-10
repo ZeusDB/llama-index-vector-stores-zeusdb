@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Delete examples - Added `examples/delete_examples.py` demonstrating supported deletion operations and workarounds.
 - Test coverage - Added tests for ID-based deletion and proper error handling for unsupported operations.
 - Addeed Product Quantization (PQ) support - Full support for memory-efficient vector compression with automatic training
+- **Persistence Support**: Complete save/load functionality for ZeusDB indexes
+  - Save indexes to disk with `save_index(path)`
+  - Load indexes from disk with `load_index(path)`
+  - Preserves vectors, metadata, HNSW graph structure, and quantization configuration
+  - Directory-based format (.zdb) with JSON metadata and binary data files
+  - Cross-platform compatibility for sharing indexes between systems
+  - Added comprehensive persistence examples (`examples/persistence_examples.py`)
 
 ### Changed
 

@@ -310,6 +310,8 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
       - Converts ZeusDB distances to similarity scores (higher = better).
       - Supports opt-in MMR when the caller requests it.
       - Provides async wrappers via thread offload.
+
+      Persistence Note: Quantized indexes currently load in raw mode
     """
 
     stores_text: bool = False
@@ -918,16 +920,143 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         store.add(nodes)
         return store
 
+
+    # @classmethod
+    # def load_index(
+    #     cls,
+    #     path: str,
+    #     **kwargs: Any,
+    # ) -> ZeusDBVectorStore:
+    #     """Load ZeusDB index from disk."""
+    #     vdb = VectorDatabase()
+    #     zeusdb_index = vdb.load(path)
+    #     return cls(zeusdb_index=zeusdb_index, **kwargs)
+    
+
+    # @classmethod
+    # def load_index(
+    #     cls,
+    #     path: str,
+    #     **kwargs: Any,
+    # ) -> ZeusDBVectorStore:
+    #     """Load ZeusDB index from disk."""
+    #     vdb = VectorDatabase()
+    #     zeusdb_index = vdb.load(path)
+
+    #     store = cls(zeusdb_index=zeusdb_index, **kwargs)
+
+    #     # WORKAROUND: Re-activate quantization if it was trained but not active
+    #     try:
+    #         if hasattr(zeusdb_index, 'can_use_quantization'):
+    #             can_use = zeusdb_index.can_use_quantization()
+    #             is_active = zeusdb_index.is_quantized()
+
+    #             if can_use and not is_active:
+    #                 logger.info(
+    #                     "Re-activating quantization after load",
+    #                     operation="load_index",
+    #                     path=path,
+    #                 )
+
+    #                 # Try multiple methods to activate quantization
+    #                 if hasattr(zeusdb_index, 'activate_quantization'):
+    #                     zeusdb_index.activate_quantization()
+    #                     logger.info("Quantization activated successfully")
+    #                 elif hasattr(zeusdb_index, 'rebuild_quantized_codes'):
+    #                     zeusdb_index.rebuild_quantized_codes()
+    #                     logger.info("Quantized codes rebuilt successfully")
+    #                 elif hasattr(zeusdb_index, 'switch_to_quantized'):
+    #                     zeusdb_index.switch_to_quantized()
+    #                     logger.info("Switched to quantized mode successfully")
+    #                 else:
+    #                     logger.warning(
+    #                         "Quantization trained but no activation method found"
+    #                     )
+    #     except Exception as e:
+    #         logger.warning(
+    #             "Failed to re-activate quantization",
+    #             operation="load_index",
+    #             error=str(e),
+    #             error_type=type(e).__name__,
+    #         )
+
+    #     return store
+    
+
+
     @classmethod
     def load_index(
         cls,
         path: str,
         **kwargs: Any,
     ) -> ZeusDBVectorStore:
-        """Load ZeusDB index from disk."""
-        vdb = VectorDatabase()
-        zeusdb_index = vdb.load(path)
-        return cls(zeusdb_index=zeusdb_index, **kwargs)
+        """
+        Load ZeusDB index from disk.
+
+        Quantized indexes will load in raw mode.
+        The quantization model and training state are preserved, but quantized
+        search will not be active until the next ZeusDB release.
+
+        The index will function correctly using raw vectors,
+        with full search accuracy but without memory compression benefits.
+        """
+        with operation_context("load_index", path=path):
+            vdb = VectorDatabase()
+            zeusdb_index = vdb.load(path)
+
+            store = cls(zeusdb_index=zeusdb_index, **kwargs)
+
+            # Detect and warn about quantization state
+            try:
+                can_use = store.can_use_quantization()
+                is_active = store.is_quantized()
+                storage_mode = store.get_storage_mode()
+
+                if can_use and not is_active:
+                    logger.warning(
+                        "Quantized index loaded in raw mode",
+                        operation="load_index",
+                        storage_mode=storage_mode,
+                        can_use_quantization=can_use,
+                        is_quantized=is_active,
+                    )
+
+                    quant_info = store.get_quantization_info()
+                    if quant_info:
+                        logger.info(
+                            "Quantization config preserved but not active",
+                            operation="load_index",
+                            compression_ratio=quant_info.get(
+                                'compression_ratio', 'N/A'
+                            ),
+                            subvectors=quant_info.get('subvectors', 'N/A'),
+                            bits=quant_info.get('bits', 'N/A'),
+                        )
+
+                    logger.info(
+                        "Index will use raw vectors. Search accuracy preserved. "
+                        "Memory compression unavailable until next release.",
+                        operation="load_index",
+                    )
+
+            except Exception as e:
+                logger.debug(
+                    "Could not check quantization status",
+                    operation="load_index",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+
+            return store
+        
+        
+
+
+
+
+
+
+
 
     def get_vector_count(self) -> int:
         """Return total vectors in the index (best-effort)."""
