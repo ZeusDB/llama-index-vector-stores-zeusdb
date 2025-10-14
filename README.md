@@ -5,9 +5,11 @@ ZeusDB vector database integration for LlamaIndex. Connect LlamaIndex's RAG fram
 ## Features
 
 - **Production Ready**: Built for enterprise-scale RAG applications
-- **Advanced Filtering**: Comprehensive metadata filtering with complex operators  
-- **MMR Support**: Maximal Marginal Relevance for diverse result sets
-- **Async Helpers**: Async wrappers for add, query, delete, and clear
+- **Persistence**: Complete save/load functionality with cross-platform compatibility
+- **Advanced Filtering**: Comprehensive metadata filtering with complex operators
+- **MMR Support**: Maximal Marginal Relevance for diverse, non-redundant results
+- **Quantization**: Product Quantization (PQ) for memory-efficient vector storage
+- **Async Support**: Async wrappers for non-blocking operations (`aadd`, `aquery`, `adelete_nodes`)
 
 ## Installation
 
@@ -21,10 +23,12 @@ pip install llama-index-vector-stores-zeusdb
 from llama_index.core import VectorStoreIndex, Document, StorageContext
 from llama_index.vector_stores.zeusdb import ZeusDBVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.llms.openai import OpenAI
 from llama_index.core import Settings
 
-# Set up embedding model
+# Set up embedding model and LLM
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
+Settings.llm = OpenAI(model="gpt-5")
 
 # Create ZeusDB vector store
 vector_store = ZeusDBVectorStore(
@@ -45,7 +49,7 @@ documents = [
 
 # Create index and store documents
 index = VectorStoreIndex.from_documents(
-    documents, 
+    documents,
     storage_context=storage_context
 )
 
@@ -54,6 +58,104 @@ query_engine = index.as_query_engine()
 response = query_engine.query("What is ZeusDB?")
 print(response)
 ```
+
+## Advanced Features
+
+### Persistence
+
+Save and load indexes with complete state preservation:
+
+```python
+# Save index to disk
+vector_store.save_index("my_index.zdb")
+
+# Load index from disk
+loaded_store = ZeusDBVectorStore.load_index("my_index.zdb")
+```
+
+### MMR Search
+
+Balance relevance and diversity for comprehensive results:
+
+```python
+from llama_index.core.vector_stores.types import VectorStoreQuery
+
+# Query with MMR for diverse results
+query_embedding = embed_model.get_text_embedding("your query")
+results = vector_store.query(
+    VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=5),
+    mmr=True,
+    fetch_k=20,
+    mmr_lambda=0.7  # 0.0=max diversity, 1.0=pure relevance
+)
+
+# Note: MMR automatically enables return_vector=True for diversity calculation
+# Results contain ids and similarities (nodes=None)
+```
+
+### Quantization
+
+Reduce memory usage with Product Quantization:
+
+```python
+vector_store = ZeusDBVectorStore(
+    dim=1536,
+    distance="cosine",
+    quantization_config={
+        'type': 'pq',
+        'subvectors': 8,
+        'bits': 8,
+        'training_size': 1000,
+        'storage_mode': 'quantized_only'
+    }
+)
+```
+
+### Async Operations
+
+Non-blocking operations for web servers and concurrent workflows:
+
+```python
+import asyncio
+
+# Async add
+node_ids = await vector_store.aadd(nodes)
+
+# Async query
+results = await vector_store.aquery(query_obj)
+
+# Async delete
+await vector_store.adelete_nodes(node_ids=["id1", "id2"])
+```
+
+### Metadata Filtering
+
+Filter results by metadata:
+
+```python
+from llama_index.core.vector_stores.types import (
+    MetadataFilters,
+    FilterOperator,
+    FilterCondition
+)
+
+# Create metadata filter
+filters = MetadataFilters.from_dicts([
+    {"key": "category", "value": "tech", "operator": FilterOperator.EQ},
+    {"key": "year", "value": 2024, "operator": FilterOperator.GTE}
+], condition=FilterCondition.AND)
+
+# Query with filters
+results = vector_store.query(
+    VectorStoreQuery(
+        query_embedding=query_embedding,
+        similarity_top_k=5,
+        filters=filters
+    )
+)
+```
+
+**Supported operators**: EQ, NE, GT, GTE, LT, LTE, IN, NIN, ANY, ALL, CONTAINS, TEXT_MATCH, TEXT_MATCH_INSENSITIVE
 
 ## Configuration
 
@@ -64,28 +166,8 @@ print(response)
 | `index_type` | Index type (`hnsw`) | `hnsw` |
 | `m` | HNSW connectivity parameter | 16 |
 | `ef_construction` | HNSW build-time search depth | 200 |
-
-## Documentation
-
-For comprehensive guides, advanced examples, and configuration options, visit:
-
-**[ZeusDB LlamaIndex Documentation](https://docs.zeusdb.com/en/latest/vector_database/integrations/llamaindex.html)**
-
-## Requirements
-
-- Python 3.10+
-- llama-index-core >= 0.13.6
-- zeusdb >= 0.0.8
-
-## Contributing
-
-Contributions are welcome! Please see our [Contributing Guidelines](https://github.com/ZeusDB/.github/blob/main/CONTRIBUTING.md) for details.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/ZeusDB/llama-index-vector-stores-zeusdb/issues)
-- **Documentation**: [docs.zeusdb.com](https://docs.zeusdb.com)
-- **Email**: [contact@zeusdb.com](mailto:contact@zeusdb.com)
+| `expected_size` | Expected number of vectors | 10000 |
+| `quantization_config` | PQ quantization settings | None |
 
 ## License
 
