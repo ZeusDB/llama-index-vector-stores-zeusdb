@@ -1,9 +1,49 @@
+<!-- markdownlint-disable MD024 -->
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [0.1.1] - 2025-10-14
+
+### Added
+
+- Delete examples - Added `examples/delete_examples.py` demonstrating supported deletion operations and workarounds.
+- Test coverage - Added tests for ID-based deletion and proper error handling for unsupported operations.
+- Addeed Product **Quantization (PQ) support** - Full support for memory-efficient vector compression with automatic training
+- **Persistence Support**: Complete save/load functionality for ZeusDB indexes
+  - Save indexes to disk with `save_index(path)`
+  - Load indexes from disk with `load_index(path)`
+  - Preserves vectors, metadata, HNSW graph structure, and quantization configuration
+  - Directory-based format (.zdb) with JSON metadata and binary data files
+  - Cross-platform compatibility for sharing indexes between systems
+  - Added comprehensive persistence examples (`examples/persistence_examples.py`)
+- **Async Support**: Full asynchronous operation support for non-blocking workflows
+  - `aadd()` - Add nodes asynchronously
+  - `aquery()` - Query asynchronously  
+  - `adelete_nodes()` - Delete nodes by IDs asynchronously
+  - Thread-offloaded async wrappers using `asyncio.to_thread()`
+- **MMR (Maximal Marginal Relevance) Search**: Diversity-focused retrieval for comprehensive results
+  - Balance relevance and diversity with `mmr_lambda` parameter (0.0-1.0)
+  - Control candidate pool size with `fetch_k` parameter
+  - Prevents redundant/similar results in search responses
+  - Perfect for RAG applications, research, and multi-perspective retrieval
+- Added comprehensive async examples (`examples/async_examples.py`)
+- Added MMR examples (`examples/mmr_examples.py`)
+
+### Changed
+
+- Filter format alignment — Updated _filters_to_zeusdb() to produce a flat dictionary with implicit AND (e.g., { "key": value, "other": { "op": value } }) instead of a nested {"and": [...]} structure, matching the Rust implementation.
+- Test infrastructure — Updated _match_filter() in the test fake from the nested format to the flat format to reflect production behavior.
+
+### Fixed
+
+- Filter translation for metadata queries - _filters_to_zeusdb() now emits the flat format expected by the ZeusDB backend. Single filters and AND combinations are handled correctly. The previous nested format could cause filtered queries to return zero results.
+- Deletion behavior - Correctly implemented ID-based deletion using `remove_point()`. Delete operations now properly remove vectors from the index and update vector counts.
 
 ---
 

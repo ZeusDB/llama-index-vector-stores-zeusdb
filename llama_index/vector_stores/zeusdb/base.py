@@ -172,26 +172,74 @@ def _translate_filter_op(op: FilterOperator) -> str:
     return mapping.get(op, "eq")
 
 
+# def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
+#     """
+#     Convert LlamaIndex MetadataFilters (nested + operators) to ZeusDB filter dict.
+#     """
+#     if filters is None:
+#         return None
+
+#     def _one(f: MetadataFilter | MetadataFilters) -> dict[str, Any]:
+#         if isinstance(f, MetadataFilters):
+#             cond = (f.condition or FilterCondition.AND).value.lower()
+#             sub = [_one(sf) for sf in f.filters]
+#             if len(sub) == 1:
+#                 return sub[0] if cond == "and" else {cond: sub}
+#             return {cond: sub}
+#         op_key = _translate_filter_op(f.operator)
+#         return {f.key: {op_key: f.value}}
+
+#     z = _one(filters)
+#     logger.debug("translated_filters", zeusdb_filter=z)
+#     return z
+
+
 def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
     """
-    Convert LlamaIndex MetadataFilters (nested + operators) to ZeusDB filter dict.
+    Convert LlamaIndex MetadataFilters to ZeusDB flat format.
+    
+    ZeusDB expects flat dict with implicit AND:
+        {"key1": value, "key2": {"op": value}}
     """
     if filters is None:
         return None
-
+    
     def _one(f: MetadataFilter | MetadataFilters) -> dict[str, Any]:
         if isinstance(f, MetadataFilters):
             cond = (f.condition or FilterCondition.AND).value.lower()
             sub = [_one(sf) for sf in f.filters]
-            if len(sub) == 1:
-                return sub[0] if cond == "and" else {cond: sub}
-            return {cond: sub}
+            
+            if cond == "and":
+                # Merge into flat dict (implicit AND)
+                result = {}
+                for s in sub:
+                    result.update(s)
+                return result
+            else:
+                # OR is NOT supported by Rust implementation
+                logger.warning(
+                    "OR filters not supported by ZeusDB backend",
+                    operation="filter_translation",
+                    condition=cond
+                )
+                # Fallback: return first filter only
+                return sub[0] if sub else {}
+        
+        # Single filter
         op_key = _translate_filter_op(f.operator)
-        return {f.key: {op_key: f.value}}
+        
+        if op_key == "eq":
+            # Direct value for equality (matches Rust code)
+            return {f.key: f.value}
+        else:
+            # Operator wrapper for other ops
+            return {f.key: {op_key: f.value}}
+    
+    result = _one(filters)  # Changed from 'z' to 'result' for consistency
+    
+    logger.debug("translated_filters", zeusdb_filter=result)
+    return result
 
-    z = _one(filters)
-    logger.debug("translated_filters", zeusdb_filter=z)
-    return z
 
 
 # -------------------------
@@ -262,6 +310,8 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
       - Converts ZeusDB distances to similarity scores (higher = better).
       - Supports opt-in MMR when the caller requests it.
       - Provides async wrappers via thread offload.
+
+      Persistence Note: Quantized indexes currently load in raw mode
     """
 
     stores_text: bool = False
@@ -399,50 +449,104 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
     # -------------------------
 
     def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
-        zfilter = {"ref_doc_id": {"eq": ref_doc_id}}
-        with operation_context("delete_by_ref_doc_id", ref_doc_id=ref_doc_id):
-            try:
-                if hasattr(self._index, "delete"):
-                    self._index.delete(filters=zfilter)  # type: ignore[attr-defined]
-            except Exception as e:
-                logger.error(
-                    "ZeusDB delete operation failed",
-                    operation="delete_by_ref_doc_id",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    exc_info=True,
-                )
-                raise
+        """
+        Delete all nodes associated with a ref_doc_id.
 
+        ⚠️  LIMITATION: This method is NOT SUPPORTED by ZeusDB's HNSW backend.
+
+        The HNSW index only supports deletion by node ID via remove_point().
+        There is no filter-based deletion or scalable way to find all node IDs
+        for a given ref_doc_id (list() doesn't work in QuantizedOnly mode).
+
+        This method will raise NotImplementedError to be honest about the limitation.
+    
+        Alternative: Use delete_nodes(node_ids=[...]) if you have the node IDs.
+        """
+        logger.error(
+            "delete() by ref_doc_id is not supported by ZeusDB HNSW backend",
+            operation="delete",
+            ref_doc_id=ref_doc_id,
+        )
+        raise NotImplementedError(
+            "ZeusDB HNSW backend does not support deletion by ref_doc_id. "
+            "The backend only supports ID-based deletion via remove_point(). "
+            "Use delete_nodes(node_ids=[...]) instead if you have the node IDs."
+        )
+    
     def delete_nodes(
         self,
         node_ids: list[str] | None = None,
         filters: MetadataFilters | None = None,
         **delete_kwargs: Any,
     ) -> None:
-        zfilter = _filters_to_zeusdb(filters)
-        if node_ids:
-            id_filters = [{"node_id": {"in": list(map(str, node_ids))}}]
-            if zfilter is None:
-                zfilter = {"and": id_filters}
-            else:
-                zfilter = {"and": [zfilter] + id_filters}
-
-        if zfilter is None:
+        """
+        Delete nodes by IDs.
+    
+        ✅ SUPPORTED: Deletion by explicit node IDs via remove_point().
+        ❌ NOT SUPPORTED: Deletion by metadata filters.
+    
+        Args:
+            node_ids: List of node IDs to delete (supported)
+            filters: Metadata filters (NOT supported - will raise error if provided)
+    
+        Note: ZeusDB HNSW only supports direct ID-based deletion.
+        """
+        if filters:
+            logger.error(
+                "delete_nodes() with filters is not supported by ZeusDB HNSW backend",
+                operation="delete_nodes",
+                has_filters=True,
+            )
+            raise NotImplementedError(
+                "ZeusDB HNSW backend does not support filter-based deletion. "
+                "Only direct node ID deletion is supported."
+            )
+        
+        if not node_ids:
+            logger.debug("delete_nodes called with no node_ids")
             return
-
-        with operation_context(
-            "delete_nodes",
-            node_ids_count=len(node_ids or []),
-            has_filters=zfilter is not None,
-        ):
+        
+        with operation_context("delete_nodes", node_ids_count=len(node_ids)):
             try:
-                if hasattr(self._index, "delete"):
-                    self._index.delete(filters=zfilter)  # type: ignore[attr-defined]
+                success_count = 0
+                failed_ids = []
+
+                for node_id in node_ids:
+                    try:
+                        result = self._index.remove_point(node_id)
+                        if result:
+                            success_count += 1
+                        else:
+                            failed_ids.append(node_id)
+                    except Exception as e:
+                        failed_ids.append(node_id)
+                        logger.warning(
+                            "Failed to remove point",
+                            operation="delete_nodes",
+                            node_id=node_id,
+                            error=str(e),
+                        )
+
+                logger.info(
+                    "Delete nodes completed",
+                    operation="delete_nodes",
+                    requested=len(node_ids),
+                    deleted=success_count,
+                    failed=len(failed_ids),
+                )
+
+                if failed_ids and len(failed_ids) < 10:
+                    logger.debug(
+                        "Failed node IDs",
+                        operation="delete_nodes",
+                        failed_ids=failed_ids,
+                    )
+
             except Exception as e:
                 logger.error(
-                    "ZeusDB delete_nodes operation failed",
+                    "Delete nodes failed",
                     operation="delete_nodes",
+                    node_ids_count=len(node_ids),
                     error=str(e),
                     error_type=type(e).__name__,
                     exc_info=True,
@@ -450,19 +554,37 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 raise
 
     def clear(self) -> None:
+        """
+        Clear all vectors from the index.
+    
+        ⚠️  LIMITATION: May not work correctly in QuantizedOnly mode.
+    
+        The clear() method may not properly clear quantized-only vectors.
+        """
         with operation_context("clear_index"):
             try:
                 if hasattr(self._index, "clear"):
-                    self._index.clear()  # type: ignore[attr-defined]
+                    self._index.clear()
+                    logger.info("Index cleared", operation="clear_index")
+                else:
+                    logger.warning(
+                        "clear() not available on index",
+                        operation="clear_index",
+                    )
+                    raise NotImplementedError(
+                        "ZeusDB index does not expose clear() method"
+                    )
             except Exception as e:
                 logger.error(
-                    "ZeusDB clear operation failed",
+                    "Clear operation failed",
                     operation="clear_index",
                     error=str(e),
                     error_type=type(e).__name__,
                     exc_info=True,
                 )
                 raise
+
+
 
     # -------------------------
     # Query (with optional MMR)
@@ -798,16 +920,143 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         store.add(nodes)
         return store
 
+
+    # @classmethod
+    # def load_index(
+    #     cls,
+    #     path: str,
+    #     **kwargs: Any,
+    # ) -> ZeusDBVectorStore:
+    #     """Load ZeusDB index from disk."""
+    #     vdb = VectorDatabase()
+    #     zeusdb_index = vdb.load(path)
+    #     return cls(zeusdb_index=zeusdb_index, **kwargs)
+    
+
+    # @classmethod
+    # def load_index(
+    #     cls,
+    #     path: str,
+    #     **kwargs: Any,
+    # ) -> ZeusDBVectorStore:
+    #     """Load ZeusDB index from disk."""
+    #     vdb = VectorDatabase()
+    #     zeusdb_index = vdb.load(path)
+
+    #     store = cls(zeusdb_index=zeusdb_index, **kwargs)
+
+    #     # WORKAROUND: Re-activate quantization if it was trained but not active
+    #     try:
+    #         if hasattr(zeusdb_index, 'can_use_quantization'):
+    #             can_use = zeusdb_index.can_use_quantization()
+    #             is_active = zeusdb_index.is_quantized()
+
+    #             if can_use and not is_active:
+    #                 logger.info(
+    #                     "Re-activating quantization after load",
+    #                     operation="load_index",
+    #                     path=path,
+    #                 )
+
+    #                 # Try multiple methods to activate quantization
+    #                 if hasattr(zeusdb_index, 'activate_quantization'):
+    #                     zeusdb_index.activate_quantization()
+    #                     logger.info("Quantization activated successfully")
+    #                 elif hasattr(zeusdb_index, 'rebuild_quantized_codes'):
+    #                     zeusdb_index.rebuild_quantized_codes()
+    #                     logger.info("Quantized codes rebuilt successfully")
+    #                 elif hasattr(zeusdb_index, 'switch_to_quantized'):
+    #                     zeusdb_index.switch_to_quantized()
+    #                     logger.info("Switched to quantized mode successfully")
+    #                 else:
+    #                     logger.warning(
+    #                         "Quantization trained but no activation method found"
+    #                     )
+    #     except Exception as e:
+    #         logger.warning(
+    #             "Failed to re-activate quantization",
+    #             operation="load_index",
+    #             error=str(e),
+    #             error_type=type(e).__name__,
+    #         )
+
+    #     return store
+    
+
+
     @classmethod
     def load_index(
         cls,
         path: str,
         **kwargs: Any,
     ) -> ZeusDBVectorStore:
-        """Load ZeusDB index from disk."""
-        vdb = VectorDatabase()
-        zeusdb_index = vdb.load(path)
-        return cls(zeusdb_index=zeusdb_index, **kwargs)
+        """
+        Load ZeusDB index from disk.
+
+        Quantized indexes will load in raw mode.
+        The quantization model and training state are preserved, but quantized
+        search will not be active until the next ZeusDB release.
+
+        The index will function correctly using raw vectors,
+        with full search accuracy but without memory compression benefits.
+        """
+        with operation_context("load_index", path=path):
+            vdb = VectorDatabase()
+            zeusdb_index = vdb.load(path)
+
+            store = cls(zeusdb_index=zeusdb_index, **kwargs)
+
+            # Detect and warn about quantization state
+            try:
+                can_use = store.can_use_quantization()
+                is_active = store.is_quantized()
+                storage_mode = store.get_storage_mode()
+
+                if can_use and not is_active:
+                    logger.warning(
+                        "Quantized index loaded in raw mode",
+                        operation="load_index",
+                        storage_mode=storage_mode,
+                        can_use_quantization=can_use,
+                        is_quantized=is_active,
+                    )
+
+                    quant_info = store.get_quantization_info()
+                    if quant_info:
+                        logger.info(
+                            "Quantization config preserved but not active",
+                            operation="load_index",
+                            compression_ratio=quant_info.get(
+                                'compression_ratio', 'N/A'
+                            ),
+                            subvectors=quant_info.get('subvectors', 'N/A'),
+                            bits=quant_info.get('bits', 'N/A'),
+                        )
+
+                    logger.info(
+                        "Index will use raw vectors. Search accuracy preserved. "
+                        "Memory compression unavailable until next release.",
+                        operation="load_index",
+                    )
+
+            except Exception as e:
+                logger.debug(
+                    "Could not check quantization status",
+                    operation="load_index",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+
+            return store
+        
+        
+
+
+
+
+
+
+
 
     def get_vector_count(self) -> int:
         """Return total vectors in the index (best-effort)."""
@@ -850,3 +1099,197 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 error_type=type(e).__name__,
             )
         return False
+    
+    def info(self) -> str:
+        """
+        Get a human-readable info string about the index.
+
+        Example:
+        >>> print(vector_store.info())
+        HNSWIndex(dim=1536, space=cosine, vectors=1200, quantized=True, ...)
+        """
+        try:
+            info_str = self._index.info()
+            logger.debug(
+                "Retrieved index info",
+                operation="info",
+                info_length=len(info_str)
+            )
+            return info_str
+        except Exception as e:
+            logger.error(
+                "Failed to get index info",
+                operation="info",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return f"ZeusDBVectorStore(error: {e})"
+        
+
+    # -------------------------------------------------------------------------
+    # Quantization Methods
+    # -------------------------------------------------------------------------
+
+    def get_training_progress(self) -> float:
+        """
+        Get quantization training progress percentage.
+    
+        Returns:
+            float: Training progress as percentage (0.0 to 100.0).
+                Returns 0.0 if quantization is not configured or on error.
+    
+        Example:
+            >>> progress = vector_store.get_training_progress()
+            >>> print(f"Training: {progress:.1f}% complete")
+        """
+        try:
+            progress = self._index.get_training_progress()
+            logger.debug(
+                "Retrieved training progress",
+                operation="get_training_progress",
+                progress_percent=progress,
+            )
+            return progress
+        except Exception as e:
+            logger.error(
+                "Failed to get training progress",
+                operation="get_training_progress",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return 0.0
+        
+    def is_quantized(self) -> bool:
+        """
+        Check whether quantized search is currently active.
+
+        Returns:
+            bool: True if index is using quantized vectors for search,
+            False otherwise or on error.
+
+        Example:
+            >>> if vector_store.is_quantized():
+            ...     print("Using quantized search")
+        """
+        try:
+            quantized = self._index.is_quantized()
+            logger.debug(
+                "Retrieved quantization status",
+                operation="is_quantized",
+                is_quantized=quantized,
+            )
+            return quantized
+        except Exception as e:
+            logger.error(
+                "Failed to check quantization status",
+                operation="is_quantized",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return False
+        
+    def can_use_quantization(self) -> bool:
+        """
+        Check whether quantization is available (e.g., PQ training completed).
+
+        Returns:
+            bool: True if quantization is trained and ready to use,
+            False otherwise or on error.
+
+        Example:
+            >>> if vector_store.can_use_quantization():
+            ...     print("Quantization ready")
+        """
+        try:
+            available = self._index.can_use_quantization()
+            logger.debug(
+                "Retrieved quantization availability",
+                operation="can_use_quantization",
+                can_use_quantization=available,
+            )
+            return available
+        except Exception as e:
+            logger.error(
+                "Failed to check quantization availability",
+                operation="can_use_quantization",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return False
+        
+    def get_storage_mode(self) -> str:
+        """
+        Get current storage mode.
+
+        Returns:
+            str: Storage mode string. Possible values:
+                - 'raw_only': Only raw vectors stored
+                - 'quantized_only': Only quantized vectors (memory optimized)
+                - 'quantized_with_raw': Both quantized and raw vectors
+                - 'quantized_active': Quantization is active
+                - 'unknown': On error or unable to determine
+
+        Example:
+            >>> mode = vector_store.get_storage_mode()
+            >>> print(f"Storage mode: {mode}")
+        """
+        try:
+            mode = self._index.get_storage_mode()
+            logger.debug(
+                "Retrieved storage mode",
+                operation="get_storage_mode",
+                storage_mode=mode,
+            )
+            return mode
+        except Exception as e:
+            logger.error(
+                "Failed to get storage mode",
+                operation="get_storage_mode",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return "unknown"
+        
+    def get_quantization_info(self) -> dict[str, Any] | None:
+        """
+        Get detailed quantization information.
+
+        Returns:
+            Optional[Dict]: Dictionary containing quantization details:
+                - compression_ratio: Memory compression factor (e.g., 16.0 for 16x)
+                - memory_mb: Estimated memory usage in megabytes
+                - subvectors: Number of subvectors used
+                - bits: Bits per quantized code
+                - trained: Whether training is complete
+                - training_size: Number of vectors used for training
+                Returns None if quantization is not configured/trained or on error.
+
+        Example:
+            >>> info = vector_store.get_quantization_info()
+            >>> if info:
+            ...     print(f"Compression: {info['compression_ratio']:.1f}x")
+            ...     print(f"Memory: {info['memory_mb']:.2f} MB")
+        """
+        try:
+            info = self._index.get_quantization_info()
+            logger.debug(
+                "Retrieved quantization info",
+                operation="get_quantization_info",
+                has_quantization=info is not None,
+            )
+            return info
+        except Exception as e:
+            logger.error(
+                "Failed to get quantization info",
+                operation="get_quantization_info",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            return None
+
