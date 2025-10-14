@@ -1540,15 +1540,15 @@ wheels = [
 
 [[package]]
 name = "llama-index-llms-openai"
-version = "0.6.0"
+version = "0.6.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "llama-index-core" },
     { name = "openai" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1a/e8/f792f0de615a9b5596aa5ea17aca27701e19921c55f034015d15c21079c2/llama_index_llms_openai-0.6.0.tar.gz", hash = "sha256:61f4aae50085ca290e6e29871b8a9da1ce11277f3352c752048f9ebd3f2a1d75", size = 24550, upload-time = "2025-09-24T15:44:51.322Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/eb/f5c3722d5ba6d1e83b5b00eae6327be890d057ddec00c9c82cb348898b58/llama_index_llms_openai-0.6.4.tar.gz", hash = "sha256:80e2afec93f52045474492d7e577c4f51f8618d005e92c9730550323a9411f19", size = 24580, upload-time = "2025-10-07T21:36:51.488Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/73/97d8826dea33052707b320e2c2261e5188b0976efa34f84d6a8f230648c8/llama_index_llms_openai-0.6.0-py3-none-any.whl", hash = "sha256:5ee0bfba835a7c0d3c3b72ecee6d092658212a8e80e3061f5fe1b7d65f0b1ac4", size = 25626, upload-time = "2025-09-24T15:44:50.006Z" },
+    { url = "https://files.pythonhosted.org/packages/18/2e/9a7c36cfcc72333b549fb0fd88bbc2af7af79f51ead7dfcbc4ed8ed9138f/llama_index_llms_openai-0.6.4-py3-none-any.whl", hash = "sha256:3466d77ef1b8996605cf4fdc2dd87e0efb1e035d2a1749bcbcd688dfa36b2a0c", size = 25664, upload-time = "2025-10-07T21:36:50.21Z" },
 ]
 
 [[package]]
@@ -1580,11 +1580,6 @@ dev = [
     { name = "types-requests" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest-asyncio" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=25.1" },
@@ -1592,13 +1587,13 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'dev'", specifier = ">=8.10.0" },
     { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "llama-index-core", specifier = ">=0.14.4" },
-    { name = "llama-index-embeddings-openai", marker = "extra == 'dev'" },
-    { name = "llama-index-llms-openai", marker = "extra == 'dev'" },
+    { name = "llama-index-embeddings-openai", marker = "extra == 'dev'", specifier = ">=0.5.1" },
+    { name = "llama-index-llms-openai", marker = "extra == 'dev'", specifier = ">=0.6.4" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.17" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.3" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15" },
     { name = "python-dotenv", marker = "extra == 'dev'", specifier = ">=1.1.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12" },
@@ -1606,9 +1601,6 @@ requires-dist = [
     { name = "zeusdb", specifier = ">=0.0.8" },
 ]
 provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest-asyncio", specifier = ">=1.2.0" }]
 
 [[package]]
 name = "llama-index-workflows"
