@@ -10,7 +10,25 @@ readme = "README.md"
 requires-python = ">=3.10,<4.0"
 license = { text = "MIT" }
 authors = [{ name = "ZeusDB", email = "contact@zeusdb.com" }]
-
+keywords = [
+    "vector-database",
+    "embeddings",
+    "semantic-search",
+    "rag",
+    "llama-index",
+    "zeusdb",
+    "hnsw",
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 # Runtime dependencies
 dependencies = [
     "llama-index-core>=0.14.4",  # Latest release as of Oct 4, 2025
@@ -20,27 +38,23 @@ dependencies = [
 [project.optional-dependencies]
 # Install with: uv pip install -e ".[dev]"
 dev = [
-    "pytest>=8.4", # Latest KEEP
-    "pytest-asyncio>=0.24", 
-    "pytest-mock>=3.15", # Latest KEEP
-    "ruff>=0.12", # Latest KEEP
-    "black>=25.1", # Latest KEEP
-    "mypy>=1.17", # Latest KEEP
-    "pre-commit>=4.3", # Latest
+    "pytest>=8.4", 
+    "pytest-asyncio>=1.2.0", 
+    "pytest-mock>=3.15", 
+    "ruff>=0.12", 
+    "black>=25.1", 
+    "mypy>=1.17", 
+    "pre-commit>=4.3",
     "codespell[toml]>=2.2.6",
-    # "ipython>=9.5", # Latest
+    # "ipython>=9.5", 
     "ipython>=8.10.0", #need support for python 3.10
     "jupyter>=1.0.0",
     "pylint>=3.3", # Latest
     # "tree-sitter-languages>=1.10.2", # Not compatible with 3.13
-    # "types-Deprecated>=1.2.15", # Latest
-    # "types-PyYAML>=6.0.12", # Current
-    # "types-protobuf>=6.30.2", # Latest
-    # "types-redis>=4.6.0", # Latest
     "types-requests>=2.32", # Latest KEEP
     # "types-setuptools>=80.9", # Latest
-    "llama-index-embeddings-openai",
-    "llama-index-llms-openai",
+    "llama-index-embeddings-openai>=0.5.1",
+    "llama-index-llms-openai>=0.6.4",
     "python-dotenv>=1.1.1",  # For examples and environment variable loading    
 ]
 
@@ -107,7 +121,3 @@ python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
 
-[dependency-groups]
-dev = [
-    "pytest-asyncio>=1.2.0",
-]
