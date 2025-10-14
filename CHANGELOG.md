@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.1] - 2025-xx-xx
+## [0.1.1] - 2025-10-14
 
 ### Added
 
@@ -44,9 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Filter translation for metadata queries - _filters_to_zeusdb() now emits the flat format expected by the ZeusDB backend. Single filters and AND combinations are handled correctly. The previous nested format could cause filtered queries to return zero results.
 - Deletion behavior - Correctly implemented ID-based deletion using `remove_point()`. Delete operations now properly remove vectors from the index and update vector counts.
-
-### Removed
-<!-- Add removals/deprecations here -->
 
 ---
 
