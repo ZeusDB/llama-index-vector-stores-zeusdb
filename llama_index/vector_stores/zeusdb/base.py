@@ -172,28 +172,6 @@ def _translate_filter_op(op: FilterOperator) -> str:
     return mapping.get(op, "eq")
 
 
-# def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
-#     """
-#     Convert LlamaIndex MetadataFilters (nested + operators) to ZeusDB filter dict.
-#     """
-#     if filters is None:
-#         return None
-
-#     def _one(f: MetadataFilter | MetadataFilters) -> dict[str, Any]:
-#         if isinstance(f, MetadataFilters):
-#             cond = (f.condition or FilterCondition.AND).value.lower()
-#             sub = [_one(sf) for sf in f.filters]
-#             if len(sub) == 1:
-#                 return sub[0] if cond == "and" else {cond: sub}
-#             return {cond: sub}
-#         op_key = _translate_filter_op(f.operator)
-#         return {f.key: {op_key: f.value}}
-
-#     z = _one(filters)
-#     logger.debug("translated_filters", zeusdb_filter=z)
-#     return z
-
-
 def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
     """
     Convert LlamaIndex MetadataFilters to ZeusDB flat format.
@@ -921,69 +899,6 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         return store
 
 
-    # @classmethod
-    # def load_index(
-    #     cls,
-    #     path: str,
-    #     **kwargs: Any,
-    # ) -> ZeusDBVectorStore:
-    #     """Load ZeusDB index from disk."""
-    #     vdb = VectorDatabase()
-    #     zeusdb_index = vdb.load(path)
-    #     return cls(zeusdb_index=zeusdb_index, **kwargs)
-    
-
-    # @classmethod
-    # def load_index(
-    #     cls,
-    #     path: str,
-    #     **kwargs: Any,
-    # ) -> ZeusDBVectorStore:
-    #     """Load ZeusDB index from disk."""
-    #     vdb = VectorDatabase()
-    #     zeusdb_index = vdb.load(path)
-
-    #     store = cls(zeusdb_index=zeusdb_index, **kwargs)
-
-    #     # WORKAROUND: Re-activate quantization if it was trained but not active
-    #     try:
-    #         if hasattr(zeusdb_index, 'can_use_quantization'):
-    #             can_use = zeusdb_index.can_use_quantization()
-    #             is_active = zeusdb_index.is_quantized()
-
-    #             if can_use and not is_active:
-    #                 logger.info(
-    #                     "Re-activating quantization after load",
-    #                     operation="load_index",
-    #                     path=path,
-    #                 )
-
-    #                 # Try multiple methods to activate quantization
-    #                 if hasattr(zeusdb_index, 'activate_quantization'):
-    #                     zeusdb_index.activate_quantization()
-    #                     logger.info("Quantization activated successfully")
-    #                 elif hasattr(zeusdb_index, 'rebuild_quantized_codes'):
-    #                     zeusdb_index.rebuild_quantized_codes()
-    #                     logger.info("Quantized codes rebuilt successfully")
-    #                 elif hasattr(zeusdb_index, 'switch_to_quantized'):
-    #                     zeusdb_index.switch_to_quantized()
-    #                     logger.info("Switched to quantized mode successfully")
-    #                 else:
-    #                     logger.warning(
-    #                         "Quantization trained but no activation method found"
-    #                     )
-    #     except Exception as e:
-    #         logger.warning(
-    #             "Failed to re-activate quantization",
-    #             operation="load_index",
-    #             error=str(e),
-    #             error_type=type(e).__name__,
-    #         )
-
-    #     return store
-    
-
-
     @classmethod
     def load_index(
         cls,
@@ -1292,4 +1207,3 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 exc_info=True,
             )
             return None
-
