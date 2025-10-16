@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2025-10-16
+
+### Changed
+
+- **Async API naming**: Renamed `aadd()` to `async_add()` to align with LlamaIndex standard async method naming conventions. The adapter now uses the official LlamaIndex async API (`async_add`, `aquery`, `adelete`, `adelete_nodes`, `aclear`) for consistency across the ecosystem.
+- Updated async examples to use standard LlamaIndex async method names instead of custom aliases.
+- Updated documentation strings to reference `async_add()` instead of `aadd()`.
+
+---
+
 ## [0.1.1] - 2025-10-14
 
 ### Added
