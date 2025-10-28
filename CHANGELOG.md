@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3] - 2025-10-28
+
+### Added
+
+- Added `.venv` to the `mypy` exclude list to improve compatibility with local development environments.
+
+### Changed
+
+- Bumped `llama-index-core` to `>=0.14.6` to match the latest LlamaIndex release (Oct 26, 2025).
+- Updated `llama-index-llms-openai` development dependency to `>=0.6.6`.
+- Updated `pyproject.toml` build includes for proper source distribution packaging (relative paths under `[tool.hatch.build.targets.sdist]`).
+
+---
+
 ## [0.1.2] - 2025-10-16
 
 ### Changed

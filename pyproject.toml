@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llama-index-vector-stores-zeusdb"
-version = "0.1.2"
+version = "0.1.3"
 description = "LlamaIndex integration for ZeusDB vector database. Enterprise-grade RAG with high-performance vector search."
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
@@ -31,7 +31,7 @@ classifiers = [
 ]
 # Runtime dependencies
 dependencies = [
-    "llama-index-core>=0.14.4",  # Latest release as of Oct 4, 2025
+    "llama-index-core>=0.14.6",  # Latest release as of Oct 26, 2025
     "zeusdb>=0.0.8",  # Megapackage version
 ]
 
@@ -54,7 +54,7 @@ dev = [
     "types-requests>=2.32", # Latest KEEP
     # "types-setuptools>=80.9", # Latest
     "llama-index-embeddings-openai>=0.5.1",
-    "llama-index-llms-openai>=0.6.4",
+    "llama-index-llms-openai>=0.6.6",
     "python-dotenv>=1.1.1",  # For examples and environment variable loading    
 ]
 
@@ -79,7 +79,7 @@ skip = "*.csv,*.html,*.json,*.jsonl,*.pdf,*.txt,*.ipynb"
 
 [tool.mypy]
 disallow_untyped_defs = true
-exclude = ["_static", "build", "examples", "notebooks", "venv"]
+exclude = ["_static", "build", "examples", "notebooks", "venv", ".venv"]
 ignore_missing_imports = true
 python_version = "3.10"
 
@@ -89,11 +89,11 @@ include = ["llama_index/vector_stores/zeusdb/py.typed"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/llama_index",
-    "/README.md",
-    "/LICENSE",
-    "/pyproject.toml",
-    "/llama_index/vector_stores/zeusdb/py.typed",
+    "llama_index",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+    "llama_index/vector_stores/zeusdb/py.typed",
 ]
 
 [tool.ruff]
