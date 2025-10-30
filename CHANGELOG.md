@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.4] - 2025-10-30
+
+### Changed
+
+- Standardized code formatting and import structure to fully match llama-index core repository style.
+- Added Ruff isort configuration for consistent import grouping and section ordering.
+- Verified compliance with Black and Ruff format checks across all ZeusDB vector store modules and examples.
+
+---
+
 ## [0.1.3] - 2025-10-28
 
 ### Added

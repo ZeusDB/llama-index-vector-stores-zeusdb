@@ -1,5 +1,6 @@
 # metadata_filter_examples.py
 from dotenv import load_dotenv
+
 from llama_index.core import Document, Settings, StorageContext, VectorStoreIndex
 from llama_index.core.vector_stores.types import (
     FilterCondition,
@@ -8,7 +9,6 @@ from llama_index.core.vector_stores.types import (
 )
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-
 from llama_index.vector_stores.zeusdb import ZeusDBVectorStore
 
 load_dotenv()
@@ -18,74 +18,70 @@ Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 Settings.llm = OpenAI(model="gpt-4")
 
 # Create ZeusDB vector store
-vector_store = ZeusDBVectorStore(
-    dim=1536,
-    distance="cosine",
-    index_type="hnsw"
-)
+vector_store = ZeusDBVectorStore(dim=1536, distance="cosine", index_type="hnsw")
 
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
 # Create documents with rich metadata
 documents = [
     Document(
-        text="ZeusDB is a high-performance vector database optimized for " \
+        text="ZeusDB is a high-performance vector database optimized for "
         "semantic search.",
         metadata={
-            "source": "doc", 
-            "topic": "zeusdb", 
-            "year": 2024, 
-            "tags": ["db", "vector", "search"]
+            "source": "doc",
+            "topic": "zeusdb",
+            "year": 2024,
+            "tags": ["db", "vector", "search"],
         },
     ),
     Document(
-        text="LlamaIndex provides RAG capabilities including retrievers, query " \
+        text="LlamaIndex provides RAG capabilities including retrievers, query "
         "engines, and rerankers.",
         metadata={
-            "source": "doc", 
-            "topic": "llamaindex", 
-            "year": 2023, 
-            "tags": ["rag", "framework"]
+            "source": "doc",
+            "topic": "llamaindex",
+            "year": 2023,
+            "tags": ["rag", "framework"],
         },
     ),
     Document(
-        text="HNSW is a graph-based ANN index enabling fast approximate nearest " \
+        text="HNSW is a graph-based ANN index enabling fast approximate nearest "
         "neighbor search.",
         metadata={
-            "source": "blog", 
-            "topic": "ann", 
-            "year": 2022, 
-            "tags": ["hnsw", "ann"]
+            "source": "blog",
+            "topic": "ann",
+            "year": 2022,
+            "tags": ["hnsw", "ann"],
         },
     ),
     Document(
-        text="ZeusDB supports cosine distance and integrates with LlamaIndex as a " \
+        text="ZeusDB supports cosine distance and integrates with LlamaIndex as a "
         "vector store.",
         metadata={
-            "source": "doc", 
-            "topic": "zeusdb", 
-            "year": 2025, 
-            "tags": ["integration", "vector"]
+            "source": "doc",
+            "topic": "zeusdb",
+            "year": 2025,
+            "tags": ["integration", "vector"],
         },
     ),
     Document(
-        text="BM25 and keyword methods focus on exact term matching rather than " \
+        text="BM25 and keyword methods focus on exact term matching rather than "
         "semantic similarity.",
         metadata={
-            "source": "blog", 
-            "topic": "ir", 
-            "year": 2021, 
-            "tags": ["bm25", "keyword", "ir"]
+            "source": "blog",
+            "topic": "ir",
+            "year": 2021,
+            "tags": ["bm25", "keyword", "ir"],
         },
     ),
     Document(
-        text="Vector search enables semantic similarity. It's commonly paired with " \
+        text="Vector search enables semantic similarity. It's commonly paired with "
         "metadata filters.",
         metadata={
-            "source": "note", 
-            "topic": "search", 
-            "year": 2024, 
-            "tags": ["vector", "filters"]
+            "source": "note",
+            "topic": "search",
+            "year": 2024,
+            "tags": ["vector", "filters"],
         },
     ),
 ]

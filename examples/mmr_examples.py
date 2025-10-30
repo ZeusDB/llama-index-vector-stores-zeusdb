@@ -4,7 +4,7 @@ ZeusDB MMR (Maximal Marginal Relevance) Examples for LlamaIndex
 
 Demonstrates using MMR to balance relevance and diversity in search results.
 
-MMR is useful when you want to avoid redundant results and ensure diverse 
+MMR is useful when you want to avoid redundant results and ensure diverse
 perspectives in your retrieved documents.
 
 Common use cases:
@@ -15,11 +15,11 @@ Common use cases:
 """
 
 from dotenv import load_dotenv
+
 from llama_index.core import Settings
 from llama_index.core.schema import TextNode
 from llama_index.core.vector_stores.types import VectorStoreQuery
 from llama_index.embeddings.openai import OpenAIEmbedding
-
 from llama_index.vector_stores.zeusdb import ZeusDBVectorStore
 
 load_dotenv()
@@ -50,11 +50,9 @@ documents = [
     "Python is a high-level programming language known for its simplicity.",
     "Python is an easy-to-learn programming language with clear syntax.",
     "Python programming language is popular for its readability.",
-    
     # Cluster 2: Python data science (similar to cluster 1)
     "Python is widely used in data science and machine learning.",
     "Data scientists prefer Python for analytics and ML tasks.",
-    
     # Cluster 3: Other languages (different topic)
     "JavaScript is essential for web development and frontend applications.",
     "Java is a robust language used in enterprise applications.",
@@ -64,10 +62,7 @@ documents = [
 print(f"Adding {len(documents)} documents...")
 nodes = []
 for i, text in enumerate(documents):
-    node = TextNode(
-        text=text,
-        metadata={"doc_id": i, "source": "examples"}
-    )
+    node = TextNode(text=text, metadata={"doc_id": i, "source": "examples"})
     node.embedding = embed_model.get_text_embedding(text)
     nodes.append(node)
 
@@ -81,10 +76,7 @@ print(f"Query: '{query_text}'")
 print()
 
 query_embedding = embed_model.get_text_embedding(query_text)
-query_obj = VectorStoreQuery(
-    query_embedding=query_embedding,
-    similarity_top_k=5
-)
+query_obj = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=5)
 
 print("📋 Standard Similarity Search (No MMR):")
 results = vector_store.query(query_obj)
@@ -123,7 +115,7 @@ mmr_results = vector_store.query(
     query_obj,
     mmr=True,
     fetch_k=8,  # Fetch more candidates
-    mmr_lambda=0.5  # Balance: 0.5 relevance, 0.5 diversity
+    mmr_lambda=0.5,  # Balance: 0.5 relevance, 0.5 diversity
 )
 
 mmr_ids = mmr_results.ids or []
@@ -158,16 +150,13 @@ lambda_values = [1.0, 0.7, 0.5, 0.3, 0.0]
 
 for lambda_val in lambda_values:
     print(f"📊 MMR with lambda={lambda_val}:")
-    
+
     mmr_results = vector_store.query(
-        query_obj,
-        mmr=True,
-        fetch_k=8,
-        mmr_lambda=lambda_val
+        query_obj, mmr=True, fetch_k=8, mmr_lambda=lambda_val
     )
-    
+
     mmr_ids = mmr_results.ids or []
-    
+
     # Just show first 3 results
     print("  Top 3 results:")
     for i, node_id in enumerate(mmr_ids[:3], 1):
@@ -192,17 +181,14 @@ articles = [
     "Machine learning models require large datasets for training accuracy.",
     "Deep learning neural networks have revolutionized computer vision.",
     "AI ethics is becoming increasingly important in model development.",
-    
     # Cloud/Infrastructure cluster
     "Cloud computing provides scalable infrastructure for applications.",
     "Kubernetes orchestrates containerized applications in production.",
     "Serverless computing reduces operational overhead significantly.",
-    
-    # Security cluster  
+    # Security cluster
     "Cybersecurity threats are evolving with sophisticated attack vectors.",
     "Zero-trust architecture is the modern approach to network security.",
     "Encryption protects sensitive data from unauthorized access.",
-    
     # DevOps cluster
     "CI/CD pipelines automate software deployment and testing.",
     "Infrastructure as code enables reproducible deployments.",
@@ -212,10 +198,7 @@ articles = [
 print(f"Creating knowledge base with {len(articles)} articles...")
 rag_nodes = []
 for i, text in enumerate(articles):
-    node = TextNode(
-        text=text,
-        metadata={"doc_id": i, "source": "tech_articles"}
-    )
+    node = TextNode(text=text, metadata={"doc_id": i, "source": "tech_articles"})
     node.embedding = embed_model.get_text_embedding(text)
     rag_nodes.append(node)
 
@@ -232,10 +215,7 @@ print(f"Question: '{question}'")
 print()
 
 query_embedding = embed_model.get_text_embedding(question)
-query_obj = VectorStoreQuery(
-    query_embedding=query_embedding,
-    similarity_top_k=4
-)
+query_obj = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=4)
 
 # Standard search - might get redundant results
 print("📋 Standard Search (Potential redundancy):")
@@ -254,7 +234,7 @@ mmr_results = rag_store.query(
     query_obj,
     mmr=True,
     fetch_k=12,  # Larger candidate pool
-    mmr_lambda=0.6  # Slightly favor relevance
+    mmr_lambda=0.6,  # Slightly favor relevance
 )
 mmr_ids = mmr_results.ids or []
 

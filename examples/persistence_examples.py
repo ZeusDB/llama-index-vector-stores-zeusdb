@@ -5,15 +5,16 @@ ZeusDB Persistence Examples for LlamaIndex
 Demonstrates how to save and load ZeusDB indexes with full state preservation,
 including vectors, metadata, HNSW graph structure, and quantization models.
 """
-import shutil
+
 from pathlib import Path
+import shutil
 
 from dotenv import load_dotenv
+
 from llama_index.core import Document, Settings, StorageContext, VectorStoreIndex
 from llama_index.core.vector_stores.types import VectorStoreQuery
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-
 from llama_index.vector_stores.zeusdb import ZeusDBVectorStore
 
 load_dotenv()
@@ -39,8 +40,8 @@ print()
 documents = [
     Document(
         text=f"Document {i}: This is a sample document about technology "
-             f"and artificial intelligence.",
-        metadata={"doc_id": i, "category": "tech"}
+        f"and artificial intelligence.",
+        metadata={"doc_id": i, "category": "tech"},
     )
     for i in range(50)
 ]
@@ -48,17 +49,11 @@ documents = [
 print(f"Creating index with {len(documents)} documents...")
 
 # Create vector store and index
-vector_store = ZeusDBVectorStore(
-    dim=1536,
-    distance="cosine",
-    index_type="hnsw"
-)
+vector_store = ZeusDBVectorStore(dim=1536, distance="cosine", index_type="hnsw")
 
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 index = VectorStoreIndex.from_documents(
-    documents,
-    storage_context=storage_context,
-    show_progress=True
+    documents, storage_context=storage_context, show_progress=True
 )
 
 print()
@@ -76,10 +71,7 @@ embed_model = Settings.embed_model
 query_embedding = embed_model.get_text_embedding(query_text)
 
 # Direct query to vector store
-query_obj = VectorStoreQuery(
-    query_embedding=query_embedding,
-    similarity_top_k=3
-)
+query_obj = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=3)
 results = vector_store.query(query_obj)
 
 # ✅ Handle None values safely
@@ -127,14 +119,14 @@ print()
 print("Comparing search results:")
 if len(result_ids) == len(loaded_ids):
     print(f"  ✅ Same number of results: {len(result_ids)}")
-    
+
     if result_ids and loaded_ids:
         # Compare top result IDs
         if result_ids[0] == loaded_ids[0]:
             print(f"  ✅ Top result matches: ID={result_ids[0]}")
         else:
             print(f"  ⚠️  Top results differ: {result_ids[0]} vs {loaded_ids[0]}")
-        
+
         # Compare similarities (should be very close)
         if result_sims and loaded_sims:
             sim_diff = abs(result_sims[0] - loaded_sims[0])
@@ -157,38 +149,34 @@ print()
 # Create index with quantization
 print("Creating quantized index...")
 quantization_config = {
-    'type': 'pq',
-    'subvectors': 8,
-    'bits': 8,
-    'training_size': 1000,
-    'storage_mode': 'quantized_only'
+    "type": "pq",
+    "subvectors": 8,
+    "bits": 8,
+    "training_size": 1000,
+    "storage_mode": "quantized_only",
 }
 
 quant_vector_store = ZeusDBVectorStore(
     dim=1536,
     distance="cosine",
     index_type="hnsw",
-    quantization_config=quantization_config
+    quantization_config=quantization_config,
 )
 
-quant_storage_context = StorageContext.from_defaults(
-    vector_store=quant_vector_store
-)
+quant_storage_context = StorageContext.from_defaults(vector_store=quant_vector_store)
 
 # Create more documents to trigger quantization
 quant_documents = [
     Document(
         text=f"Document {i}: Technology content for quantization testing.",
-        metadata={"doc_id": i, "category": "tech"}
+        metadata={"doc_id": i, "category": "tech"},
     )
     for i in range(1100)  # Enough to trigger training
 ]
 
 print(f"Adding {len(quant_documents)} documents...")
 quant_index = VectorStoreIndex.from_documents(
-    quant_documents,
-    storage_context=quant_storage_context,
-    show_progress=False
+    quant_documents, storage_context=quant_storage_context, show_progress=False
 )
 
 print()
@@ -258,7 +246,7 @@ else:
     print()
 
 if (
-    quant_vector_store.get_training_progress() 
+    quant_vector_store.get_training_progress()
     == loaded_quant_vs.get_training_progress()
 ):
     progress = loaded_quant_vs.get_training_progress()
@@ -267,14 +255,14 @@ else:
     print("  ⚠️  Training progress differs")
 
 if qi and loaded_qi:
-    if qi.get('compression_ratio') == loaded_qi.get('compression_ratio'):
-        ratio = loaded_qi.get('compression_ratio')
+    if qi.get("compression_ratio") == loaded_qi.get("compression_ratio"):
+        ratio = loaded_qi.get("compression_ratio")
         print(f"  ✅ Compression ratio preserved: {ratio:.1f}x")
     else:
         print("  ⚠️  Compression ratio differs")
-    
-    if qi.get('is_trained') == loaded_qi.get('is_trained'):
-        trained = loaded_qi.get('is_trained')
+
+    if qi.get("is_trained") == loaded_qi.get("is_trained"):
+        trained = loaded_qi.get("is_trained")
         print(f"  ✅ Training status preserved: {trained}")
     else:
         print("  ⚠️  Training status differs")
@@ -285,8 +273,7 @@ print("Testing search on loaded quantized index...")
 quant_query_text = "technology and AI"
 quant_query_embedding = embed_model.get_text_embedding(quant_query_text)
 quant_query_obj = VectorStoreQuery(
-    query_embedding=quant_query_embedding,
-    similarity_top_k=3
+    query_embedding=quant_query_embedding, similarity_top_k=3
 )
 
 loaded_quant_results = loaded_quant_vs.query(quant_query_obj)
@@ -310,10 +297,7 @@ print()
 
 # Create initial index
 cycle_docs = [
-    Document(
-        text=f"Cycle document {i}",
-        metadata={"doc_id": i, "version": 1}
-    )
+    Document(text=f"Cycle document {i}", metadata={"doc_id": i, "version": 1})
     for i in range(100)
 ]
 
@@ -321,9 +305,7 @@ print("Creating initial index...")
 cycle_vs = ZeusDBVectorStore(dim=1536, distance="cosine")
 cycle_sc = StorageContext.from_defaults(vector_store=cycle_vs)
 cycle_idx = VectorStoreIndex.from_documents(
-    cycle_docs,
-    storage_context=cycle_sc,
-    show_progress=False
+    cycle_docs, storage_context=cycle_sc, show_progress=False
 )
 
 initial_count = cycle_vs.get_vector_count()
@@ -334,21 +316,21 @@ print()
 for cycle in range(1, 4):
     save_path = f"cycle_{cycle}.zdb"
     print(f"Cycle {cycle}: Save -> Load")
-    
+
     # Save
     print(f"  Saving to '{save_path}'...")
     cycle_vs.save_index(save_path)
-    
+
     # Load
     print(f"  Loading from '{save_path}'...")
     cycle_vs = ZeusDBVectorStore.load_index(save_path)
-    
+
     # Verify
     current_count = cycle_vs.get_vector_count()
     current_info = cycle_vs.info()
     print(f"  Vector count after load: {current_count}")
     print(f"  Index info: {current_info}")
-    
+
     if current_count == initial_count:
         print(f"  ✅ Vector count stable across cycle {cycle}")
     else:
@@ -371,7 +353,7 @@ test_paths = [
     "quantized_index.zdb",
     "cycle_1.zdb",
     "cycle_2.zdb",
-    "cycle_3.zdb"
+    "cycle_3.zdb",
 ]
 
 print("Cleaning up test files:")

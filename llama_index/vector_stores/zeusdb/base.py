@@ -51,9 +51,7 @@ except Exception:  # fallback for OSS/dev environments
             extra = kwargs.get("extra", {}) or {}
             if not isinstance(extra, dict):
                 extra = {"_extra": repr(extra)}  # defensive
-            fields = {
-                k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in allowed
-            }
+            fields = {k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in allowed}
             if fields:
                 extra.update(fields)
                 kwargs["extra"] = extra
@@ -93,6 +91,7 @@ except Exception:  # fallback for OSS/dev environments
                 **context,
             )
             raise
+
 
 # Initialize module logger (central config owns handlers/format)
 get_logger: Callable[[str], Any] = cast(Callable[[str], Any], _get_logger)
@@ -175,18 +174,18 @@ def _translate_filter_op(op: FilterOperator) -> str:
 def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None:
     """
     Convert LlamaIndex MetadataFilters to ZeusDB flat format.
-    
+
     ZeusDB expects flat dict with implicit AND:
         {"key1": value, "key2": {"op": value}}
     """
     if filters is None:
         return None
-    
+
     def _one(f: MetadataFilter | MetadataFilters) -> dict[str, Any]:
         if isinstance(f, MetadataFilters):
             cond = (f.condition or FilterCondition.AND).value.lower()
             sub = [_one(sf) for sf in f.filters]
-            
+
             if cond == "and":
                 # Merge into flat dict (implicit AND)
                 result = {}
@@ -198,31 +197,31 @@ def _filters_to_zeusdb(filters: MetadataFilters | None) -> dict[str, Any] | None
                 logger.warning(
                     "OR filters not supported by ZeusDB backend",
                     operation="filter_translation",
-                    condition=cond
+                    condition=cond,
                 )
                 # Fallback: return first filter only
                 return sub[0] if sub else {}
-        
+
         # Single filter
         op_key = _translate_filter_op(f.operator)
-        
+
         if op_key == "eq":
             # Direct value for equality (matches Rust code)
             return {f.key: f.value}
         else:
             # Operator wrapper for other ops
             return {f.key: {op_key: f.value}}
-    
+
     result = _one(filters)  # Changed from 'z' to 'result' for consistency
-    
+
     logger.debug("translated_filters", zeusdb_filter=result)
     return result
-
 
 
 # -------------------------
 # MMR helpers (opt-in only)
 # -------------------------
+
 
 def _dot(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
@@ -261,6 +260,7 @@ def _mmr_select(
     remaining.remove(first)
 
     while len(selected) < min(k, n) and remaining:
+
         def score(i: int) -> float:
             # diversity term = max sim to any already-selected
             max_div = max(_cosine_sim(cand_vecs[i], cand_vecs[j]) for j in selected)
@@ -276,6 +276,7 @@ def _mmr_select(
 # -------------------------
 # ZeusDB Vector Store
 # -------------------------
+
 
 class ZeusDBVectorStore(BasePydanticVectorStore):
     """
@@ -437,7 +438,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         for a given ref_doc_id (list() doesn't work in QuantizedOnly mode).
 
         This method will raise NotImplementedError to be honest about the limitation.
-    
+
         Alternative: Use delete_nodes(node_ids=[...]) if you have the node IDs.
         """
         logger.error(
@@ -450,7 +451,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
             "The backend only supports ID-based deletion via remove_point(). "
             "Use delete_nodes(node_ids=[...]) instead if you have the node IDs."
         )
-    
+
     def delete_nodes(
         self,
         node_ids: list[str] | None = None,
@@ -459,14 +460,14 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
     ) -> None:
         """
         Delete nodes by IDs.
-    
+
         ✅ SUPPORTED: Deletion by explicit node IDs via remove_point().
         ❌ NOT SUPPORTED: Deletion by metadata filters.
-    
+
         Args:
             node_ids: List of node IDs to delete (supported)
             filters: Metadata filters (NOT supported - will raise error if provided)
-    
+
         Note: ZeusDB HNSW only supports direct ID-based deletion.
         """
         if filters:
@@ -479,11 +480,11 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 "ZeusDB HNSW backend does not support filter-based deletion. "
                 "Only direct node ID deletion is supported."
             )
-        
+
         if not node_ids:
             logger.debug("delete_nodes called with no node_ids")
             return
-        
+
         with operation_context("delete_nodes", node_ids_count=len(node_ids)):
             try:
                 success_count = 0
@@ -534,9 +535,9 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
     def clear(self) -> None:
         """
         Clear all vectors from the index.
-    
+
         ⚠️  LIMITATION: May not work correctly in QuantizedOnly mode.
-    
+
         The clear() method may not properly clear quantized-only vectors.
         """
         with operation_context("clear_index"):
@@ -562,8 +563,6 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 )
                 raise
 
-
-
     # -------------------------
     # Query (with optional MMR)
     # -------------------------
@@ -585,9 +584,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         """
         with operation_context("query", has_embedding=bool(query.query_embedding)):
             if not query.query_embedding:
-                return VectorStoreQueryResult(
-                    nodes=[], similarities=[], ids=[]
-                )
+                return VectorStoreQueryResult(nodes=[], similarities=[], ids=[])
 
             # Detect explicit MMR requests
             want_mmr = False
@@ -605,9 +602,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
             zfilter = _filters_to_zeusdb(query.filters)
             ef_search = kwargs.get("ef_search")
 
-            fetch_k = (
-                k if not want_mmr else int(kwargs.get("fetch_k", max(20, 4 * k)))
-            )
+            fetch_k = k if not want_mmr else int(kwargs.get("fetch_k", max(20, 4 * k)))
             fetch_k = max(fetch_k, k)
 
             default_lambda = 0.7 if mmr_threshold is None else mmr_threshold
@@ -617,9 +612,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
             elif mmr_lambda > 1.0:
                 mmr_lambda = 1.0
 
-            return_vector = bool(
-                kwargs.get("return_vector", False) or want_mmr
-            )
+            return_vector = bool(kwargs.get("return_vector", False) or want_mmr)
 
             logger.debug(
                 "query parameters",
@@ -671,9 +664,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
             cand_vecs: list[list[float]] = []
 
             for h in hits:
-                _id = (
-                    str(h.get("id")) if "id" in h else str(h.get("node_id", ""))
-                )
+                _id = str(h.get("id")) if "id" in h else str(h.get("node_id", ""))
                 cand_ids.append(_id)
 
                 if "distance" in h:
@@ -691,11 +682,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
 
             # Broadened search fallback (default on)
             fallback_used = False
-            if (
-                len(cand_ids) < k
-                and not zfilter
-                and kwargs.get("auto_fallback", True)
-            ):
+            if len(cand_ids) < k and not zfilter and kwargs.get("auto_fallback", True):
                 logger.debug(
                     "broadening_search_retry",
                     initial_results=len(cand_ids),
@@ -708,10 +695,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                         ef_search=max(500, max(k, fetch_k) * 10),
                         return_vector=return_vector,
                     )
-                    if (
-                        isinstance(broader_res, dict)
-                        and "results" in broader_res
-                    ):
+                    if isinstance(broader_res, dict) and "results" in broader_res:
                         broader_hits = broader_res.get("results") or []
                     elif isinstance(broader_res, list):
                         broader_hits = broader_res
@@ -737,9 +721,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                             if return_vector:
                                 v = h.get("vector")
                                 cand_vecs.append(
-                                    [float(x) for x in v]
-                                    if isinstance(v, list)
-                                    else []
+                                    [float(x) for x in v] if isinstance(v, list) else []
                                 )
                         fallback_used = True
                         logger.info(
@@ -756,8 +738,10 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
             # Optional MMR rerank (opt-in only)
             mmr_ms = 0.0
             if want_mmr:
-                if cand_vecs and all(cand_vecs) and isinstance(
-                    query.query_embedding, list
+                if (
+                    cand_vecs
+                    and all(cand_vecs)
+                    and isinstance(query.query_embedding, list)
                 ):
                     t1 = perf_counter()
                     qv = list(query.query_embedding)
@@ -855,9 +839,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         **kwargs: Any,
     ) -> None:
         """Thread-offloaded async variant of delete_nodes()."""
-        return await asyncio.to_thread(
-            self.delete_nodes, node_ids, filters, **kwargs
-        )
+        return await asyncio.to_thread(self.delete_nodes, node_ids, filters, **kwargs)
 
     async def aclear(self) -> None:
         """Thread-offloaded async variant of clear()."""
@@ -885,9 +867,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         if dim is None:
             first_emb = _extract_embedding(nodes[0])
             if first_emb is None:
-                raise ValueError(
-                    "First node has no embedding to infer dimension"
-                )
+                raise ValueError("First node has no embedding to infer dimension")
             dim = len(first_emb)
 
         store = cls(
@@ -898,7 +878,6 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         )
         store.add(nodes)
         return store
-
 
     @classmethod
     def load_index(
@@ -943,10 +922,10 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                             "Quantization config preserved but not active",
                             operation="load_index",
                             compression_ratio=quant_info.get(
-                                'compression_ratio', 'N/A'
+                                "compression_ratio", "N/A"
                             ),
-                            subvectors=quant_info.get('subvectors', 'N/A'),
-                            bits=quant_info.get('bits', 'N/A'),
+                            subvectors=quant_info.get("subvectors", "N/A"),
+                            bits=quant_info.get("bits", "N/A"),
                         )
 
                     logger.info(
@@ -964,15 +943,6 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 )
 
             return store
-        
-        
-
-
-
-
-
-
-
 
     def get_vector_count(self) -> int:
         """Return total vectors in the index (best-effort)."""
@@ -1015,7 +985,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 error_type=type(e).__name__,
             )
         return False
-    
+
     def info(self) -> str:
         """
         Get a human-readable info string about the index.
@@ -1027,9 +997,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
         try:
             info_str = self._index.info()
             logger.debug(
-                "Retrieved index info",
-                operation="info",
-                info_length=len(info_str)
+                "Retrieved index info", operation="info", info_length=len(info_str)
             )
             return info_str
         except Exception as e:
@@ -1041,7 +1009,6 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 exc_info=True,
             )
             return f"ZeusDBVectorStore(error: {e})"
-        
 
     # -------------------------------------------------------------------------
     # Quantization Methods
@@ -1050,11 +1017,11 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
     def get_training_progress(self) -> float:
         """
         Get quantization training progress percentage.
-    
+
         Returns:
             float: Training progress as percentage (0.0 to 100.0).
                 Returns 0.0 if quantization is not configured or on error.
-    
+
         Example:
             >>> progress = vector_store.get_training_progress()
             >>> print(f"Training: {progress:.1f}% complete")
@@ -1076,7 +1043,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 exc_info=True,
             )
             return 0.0
-        
+
     def is_quantized(self) -> bool:
         """
         Check whether quantized search is currently active.
@@ -1106,7 +1073,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 exc_info=True,
             )
             return False
-        
+
     def can_use_quantization(self) -> bool:
         """
         Check whether quantization is available (e.g., PQ training completed).
@@ -1136,7 +1103,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 exc_info=True,
             )
             return False
-        
+
     def get_storage_mode(self) -> str:
         """
         Get current storage mode.
@@ -1170,7 +1137,7 @@ class ZeusDBVectorStore(BasePydanticVectorStore):
                 exc_info=True,
             )
             return "unknown"
-        
+
     def get_quantization_info(self) -> dict[str, Any] | None:
         """
         Get detailed quantization information.
