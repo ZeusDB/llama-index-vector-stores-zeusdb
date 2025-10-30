@@ -1,9 +1,9 @@
 # quickstart.py
 from dotenv import load_dotenv
+
 from llama_index.core import Document, Settings, StorageContext, VectorStoreIndex
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-
 from llama_index.vector_stores.zeusdb import ZeusDBVectorStore
 
 load_dotenv()  # reads .env and sets OPENAI_API_KEY
@@ -16,7 +16,7 @@ Settings.llm = OpenAI(model="gpt-5")
 vector_store = ZeusDBVectorStore(
     dim=1536,  # OpenAI embedding dimension
     distance="cosine",
-    index_type="hnsw"
+    index_type="hnsw",
 )
 
 # Create storage context
@@ -26,14 +26,11 @@ storage_context = StorageContext.from_defaults(vector_store=vector_store)
 documents = [
     Document(text="ZeusDB is a high-performance vector database."),
     Document(text="LlamaIndex provides RAG capabilities."),
-    Document(text="Vector search enables semantic similarity.")
+    Document(text="Vector search enables semantic similarity."),
 ]
 
 # Create index and store documents
-index = VectorStoreIndex.from_documents(
-    documents, 
-    storage_context=storage_context
-)
+index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
 
 # Query the index
 query_engine = index.as_query_engine()

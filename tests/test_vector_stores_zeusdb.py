@@ -1,9 +1,9 @@
 # tests/test_vector_stores_zeusdb.py
+from dataclasses import dataclass
 import importlib
 import math
 import sys
 import types
-from dataclasses import dataclass
 
 import pytest
 
@@ -58,13 +58,13 @@ class _FakeIndex:
         """Match filter in FLAT format (like actual Rust code)."""
         if not zfilter:
             return True
-        
+
         # Iterate over flat filter dict
         for field, condition in zfilter.items():
             field_value = meta.get(field)
 
             # Direct value = equality check
-            if isinstance(condition, (str, int, float, bool, type(None))):
+            if isinstance(condition, str | int | float | bool | type(None)):
                 if field_value != condition:
                     return False
             # Operator dict
@@ -75,41 +75,41 @@ class _FakeIndex:
                     elif op == "ne" and field_value == target_value:
                         return False
                     elif op == "gt" and not (
-                        isinstance(field_value, (int, float)) 
+                        isinstance(field_value, int | float)
                         and field_value > target_value
                     ):
                         return False
                     elif op == "gte" and not (
-                        isinstance(field_value, (int, float)) 
+                        isinstance(field_value, int | float)
                         and field_value >= target_value
                     ):
                         return False
                     elif op == "lt" and not (
-                        isinstance(field_value, (int, float)) 
+                        isinstance(field_value, int | float)
                         and field_value < target_value
                     ):
                         return False
                     elif op == "lte" and not (
-                        isinstance(field_value, (int, float)) 
+                        isinstance(field_value, int | float)
                         and field_value <= target_value
                     ):
                         return False
                     elif op == "in" and field_value not in target_value:
                         return False
                     elif op == "contains":
-                        if isinstance(
-                            field_value, 
-                            list
-                        ) and target_value not in field_value:
+                        if (
+                            isinstance(field_value, list)
+                            and target_value not in field_value
+                        ):
                             return False
-                        elif isinstance(
-                            field_value, 
-                            str
-                        ) and str(target_value) not in field_value:
+                        elif (
+                            isinstance(field_value, str)
+                            and str(target_value) not in field_value
+                        ):
                             return False
                         else:
                             return False
-        
+
         return True
 
     def search(self, vector, top_k=5, filter=None, ef_search=None, return_vector=False):
@@ -134,10 +134,10 @@ class _FakeIndex:
         """Get records by IDs - needed for node reconstruction."""
         if isinstance(ids, str):
             ids = [ids]
-        
+
         results = []
         id_set = set(str(i) for i in ids)
-        
+
         for record in self.records:
             if str(record["id"]) in id_set:
                 result = {
@@ -148,7 +148,7 @@ class _FakeIndex:
                 if return_vector:
                     result["vector"] = record["vector"]
                 results.append(result)
-        
+
         return results
 
     def clear(self):
@@ -195,6 +195,7 @@ def fake_zeusdb_module(monkeypatch):
 def ZeusDBVectorStore():
     # reload our package to bind to the fake module
     import llama_index.vector_stores.zeusdb.base as zeusdb_base
+
     importlib.reload(zeusdb_base)
     return zeusdb_base.ZeusDBVectorStore
 
@@ -223,6 +224,7 @@ def test_add_and_query_basic(ZeusDBVectorStore):
 
     q = [1.0, 0.0, 0.0]
     from llama_index.core.vector_stores.types import VectorStoreQuery
+
     res = store.query(VectorStoreQuery(query_embedding=q, similarity_top_k=1))
     assert res.ids and res.similarities
     assert res.ids[0] in {"1", "2"}
@@ -254,8 +256,8 @@ def test_filters_and_delete_nodes(ZeusDBVectorStore):
     )
     res = store.query(
         VectorStoreQuery(
-            query_embedding=[1.0, 0.0, 0.0], 
-            similarity_top_k=10, 
+            query_embedding=[1.0, 0.0, 0.0],
+            similarity_top_k=10,
             filters=mf,
         )
     )
@@ -265,8 +267,8 @@ def test_filters_and_delete_nodes(ZeusDBVectorStore):
     store.delete_nodes(node_ids=["3"])
     res2 = store.query(
         VectorStoreQuery(
-            query_embedding=[1.0, 0.0, 0.0], 
-            similarity_top_k=10, 
+            query_embedding=[1.0, 0.0, 0.0],
+            similarity_top_k=10,
             filters=mf,
         )
     )
@@ -286,7 +288,7 @@ def test_delete_by_ref_doc_id_not_supported(ZeusDBVectorStore):
     # Should raise NotImplementedError
     with pytest.raises(NotImplementedError) as exc_info:
         store.delete("docA")
-    
+
     assert "ref_doc_id" in str(exc_info.value).lower()
     assert "remove_point" in str(exc_info.value).lower()
 
@@ -300,20 +302,18 @@ def test_delete_nodes_by_id_works(ZeusDBVectorStore):
         FakeNode("c", [0.0, 0.0, 1.0], {"k": 3}, id_="3", ref_doc_id="docB"),
     ]
     store.add(nodes)
-    
+
     assert store.get_vector_count() == 3
-    
+
     # Delete by node IDs
     store.delete_nodes(node_ids=["1", "2"])
-    
+
     assert store.get_vector_count() == 1
-    
+
     from llama_index.core.vector_stores.types import VectorStoreQuery
+
     res = store.query(
-        VectorStoreQuery(
-            query_embedding=[1.0, 0.0, 0.0], 
-            similarity_top_k=10
-        )
+        VectorStoreQuery(query_embedding=[1.0, 0.0, 0.0], similarity_top_k=10)
     )
     assert set(res.ids) == {"3"}  # only docB remains
 
@@ -367,13 +367,14 @@ async def test_async_paths(ZeusDBVectorStore):
 
     q = [1.0, 0.0, 0.0]
     from llama_index.core.vector_stores.types import VectorStoreQuery
+
     res = await store.aquery(VectorStoreQuery(query_embedding=q, similarity_top_k=1))
     assert res.ids and res.ids[0] == "1"
 
     # adelete by ref_doc_id should raise NotImplementedError
     with pytest.raises(NotImplementedError):
         await store.adelete(ref_doc_id="d")
-    
+
     # But adelete_nodes by ID should work
     await store.adelete_nodes(node_ids=["1"])
     res2 = await store.aquery(VectorStoreQuery(query_embedding=q, similarity_top_k=1))
@@ -394,11 +395,14 @@ def test_query_with_mmr(ZeusDBVectorStore):
     store.add(nodes)
 
     from llama_index.core.vector_stores.types import VectorStoreQuery
+
     # request k=2 with MMR enabled; fetch_k larger to force rerank variety
     res = store.query(
         VectorStoreQuery(query_embedding=[1.0, 0.0, 0.0], similarity_top_k=2),
-        mmr=True, fetch_k=5, mmr_lambda=0.7, return_vector=True
+        mmr=True,
+        fetch_k=5,
+        mmr_lambda=0.7,
+        return_vector=True,
     )
     assert len(res.ids) == 2
     assert set(res.ids).issubset({"1", "2", "3"})
-    
